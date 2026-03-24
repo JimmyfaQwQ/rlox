@@ -5,7 +5,7 @@ use std::result::Result;
 
 pub struct Scanner {
     source: Rc<str>,
-    tokens: Vec<Token>,
+    tokens: Vec<Rc<Token>>,
     start: usize,
     current: usize,
     line: usize
@@ -22,7 +22,7 @@ impl Scanner {
         }
     }
 
-    pub fn scan_tokens(&mut self) -> Result<&[Token], &'static str> {
+    pub fn scan_tokens(&mut self) -> Result<&[Rc<Token>], &'static str> {
         self.tokens.clear();
         let mut error: Option<&'static str> = None;
         while !self.is_at_end() {
@@ -183,6 +183,6 @@ impl Scanner {
 
     fn add_token(&mut self, token_type: token::TokenType, literal: Option<Literal>) {
         let text = &self.source[self.start..self.current];
-        self.tokens.push(Token::new(token_type, Some(text), literal, self.line));
+        self.tokens.push(Rc::new(Token::new(token_type, Some(text), literal, self.line)));
     }
 }

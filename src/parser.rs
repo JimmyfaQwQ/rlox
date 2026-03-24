@@ -5,12 +5,12 @@ use std::result::Result;
 use std::rc::Rc;
 
 pub struct Parser {
-    tokens: Rc<[Token]>,
+    tokens: Rc<[Rc<Token>]>,
     current: usize,
 }
 
 impl Parser {
-    pub fn new(tokens: &[Token]) -> Self {
+    pub fn new(tokens: &[Rc<Token>]) -> Self {
         Parser {
             tokens: Rc::from(tokens),
             current: 0,
