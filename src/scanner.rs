@@ -1,19 +1,20 @@
 use crate::token::{self, Token, Literal, TokenType};
 use crate::error::error;
+use std::rc::Rc;
 use std::result::Result;
 
-pub struct Scanner<'a> {
-    source: &'a str,
-    tokens: Vec<Token<'a>>,
+pub struct Scanner {
+    source: Rc<str>,
+    tokens: Vec<Token>,
     start: usize,
     current: usize,
     line: usize
 }
 
-impl<'a> Scanner<'a> {
-    pub fn new(source: &'a str) -> Self {
+impl Scanner {
+    pub fn new(source: &str) -> Self {
         Scanner {
-            source,
+            source: Rc::from(source),
             tokens: Vec::new(),
             start: 0,
             current: 0,
@@ -21,7 +22,7 @@ impl<'a> Scanner<'a> {
         }
     }
 
-    pub fn scan_tokens(&mut self) -> Result<&[Token<'_>], &'static str> {
+    pub fn scan_tokens(&mut self) -> Result<&[Token], &'static str> {
         self.tokens.clear();
         let mut error: Option<&'static str> = None;
         while !self.is_at_end() {
@@ -180,7 +181,7 @@ impl<'a> Scanner<'a> {
         self.source.chars().nth(self.current + 1).unwrap()
     }
 
-    fn add_token(&mut self, token_type: token::TokenType, literal: Option<Literal<'a>>) {
+    fn add_token(&mut self, token_type: token::TokenType, literal: Option<Literal>) {
         let text = &self.source[self.start..self.current];
         self.tokens.push(Token::new(token_type, Some(text), literal, self.line));
     }

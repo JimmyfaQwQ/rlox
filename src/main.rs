@@ -34,41 +34,51 @@ fn run_prompt() {
 
 fn run(source: &str) {
     let mut scanner = Scanner::new(source);
-    let tokens = scanner.scan_tokens();
-    match tokens {
-        Ok(tokens) => {
-            for token in tokens {
-                println!("{:?}", token);
-            }
-        },
+    let tokens_result = scanner.scan_tokens();
+    let tokens = match tokens_result {
+        Ok(tokens) => tokens,
         Err(e) => {
             info!("Scanner error: {}", e);
+            return;
         }
+    };
+    for token in tokens {
+        println!("{:?}", token);
     }
+    let mut parser = parser::Parser::new(tokens);
+    let expr_result = parser.parse();
+    let expr = match expr_result {
+        Ok(expr) => expr,
+        Err(e) => {
+            info!("Parser error: {}", e);
+            return;
+        }
+    };
+    println!("{:?}", expr);
 }
 
 fn main() {
-    // clean_log();
-    // let args = std::env::args().collect::<Vec<String>>();
-    // if args.len() > 2 {
-    //     println!("Usage: rlox [script]");
-    //     std::process::exit(64);
-    // }
-    // if args.len() == 2 {
-    //     run_file(&args[1]);
-    // } else {
-    //     run_prompt();
-    // }
+    clean_log();
+    let args = std::env::args().collect::<Vec<String>>();
+    if args.len() > 2 {
+        println!("Usage: rlox [script]");
+        std::process::exit(64);
+    }
+    if args.len() == 2 {
+        run_file(&args[1]);
+    } else {
+        run_prompt();
+    }
 
-    let expr = Expr::binary(
-        Expr::unary(
-            Token::operator(token::TokenType::Minus, Some("-"), 1),
-            Expr::literal(123.into())
-        ),
-        Token::operator(token::TokenType::Star, Some("*"), 1),
-        Expr::grouping(
-            Expr::literal(45.67.into())
-        )
-    );
-    println!("{:?}", expr);
+    // let expr = Expr::binary(
+    //     Expr::unary(
+    //         Token::operator(token::TokenType::Minus, Some("-"), 1),
+    //         Expr::literal(123.into())
+    //     ),
+    //     Token::operator(token::TokenType::Star, Some("*"), 1),
+    //     Expr::grouping(
+    //         Expr::literal(45.67.into())
+    //     )
+    // );
+    // println!("{:?}", expr);
 }
