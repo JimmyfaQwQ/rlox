@@ -1,17 +1,17 @@
-use crate::token::{self, Token};
+use crate::token::{self, Token, Literal, TokenType};
 use crate::error::error;
 use std::result::Result;
 
-pub struct Scanner {
-    source: String,
-    tokens: Vec<Token>,
+pub struct Scanner<'a> {
+    source: &'a str,
+    tokens: Vec<Token<'a>>,
     start: usize,
     current: usize,
     line: usize
 }
 
-impl Scanner {
-    pub fn new(source: String) -> Self {
+impl<'a> Scanner<'a> {
+    pub fn new(source: &'a str) -> Self {
         Scanner {
             source,
             tokens: Vec::new(),
@@ -21,7 +21,7 @@ impl Scanner {
         }
     }
 
-    pub fn scan_tokens(&mut self) -> Result<&Vec<Token>, &'static str> {
+    pub fn scan_tokens(&mut self) -> Result<&[Token<'_>], &'static str> {
         self.tokens.clear();
         let mut error: Option<&'static str> = None;
         while !self.is_at_end() {
@@ -64,23 +64,23 @@ impl Scanner {
             }
             '=' => {
                 if self.match_next('=') {
-                    self.add_token(token::TokenType::EqualEqual, None);
+                    self.add_token(TokenType::EqualEqual, None);
                 } else {
-                    self.add_token(token::TokenType::Equal, None);
+                    self.add_token(TokenType::Equal, None);
                 }
             }
             '<' => {
                 if self.match_next('=') {
-                    self.add_token(token::TokenType::LessEqual, None);
+                    self.add_token(TokenType::LessEqual, None);
                 } else {
-                    self.add_token(token::TokenType::Less, None);
+                    self.add_token(TokenType::Less, None);
                 }
             }
             '>' => {
                 if self.match_next('=') {
-                    self.add_token(token::TokenType::GreaterEqual, None);
+                    self.add_token(TokenType::GreaterEqual, None);
                 } else {
-                    self.add_token(token::TokenType::Greater, None);
+                    self.add_token(TokenType::Greater, None);
                 }
             }
             '/' => {
@@ -89,7 +89,7 @@ impl Scanner {
                         self.advance();
                     }
                 } else {
-                    self.add_token(token::TokenType::Slash, None);
+                    self.add_token(TokenType::Slash, None);
                 }
             }
             ' ' | '\r' | '\t' => (),
@@ -117,8 +117,8 @@ impl Scanner {
             return;
         }
         self.advance();
-        let value = self.source[self.start + 1..self.current - 1].to_string();
-        self.add_token(token::TokenType::String, Some(token::Literal::from(value)));
+        let value = &self.source[self.start + 1..self.current - 1];
+        self.add_token(TokenType::String, Some(Literal::from(value)));
     }
 
     fn number(&mut self) {
@@ -132,16 +132,16 @@ impl Scanner {
             }
         }
         let value = self.source[self.start..self.current].parse::<f64>().unwrap();
-        self.add_token(token::TokenType::Number, Some(token::Literal::from(value)));
+        self.add_token(TokenType::Number, Some(Literal::from(value)));
     }
 
     fn identifier(&mut self) {
         while self.peek().is_alphanumeric() || self.peek() == '_' {
             self.advance();
         }
-        let text = self.source[self.start..self.current].to_string();
-        let token_type = token::KEYWORDS.iter().find(|(k, _)| *k == text).map(|(_, v)| *v).unwrap_or(token::TokenType::Identifier);
-        self.add_token(token_type, Some(token::Literal::from(text)));
+        let text = &self.source[self.start..self.current];
+        let token_type = token::KEYWORDS.iter().find(|(k, _)| *k == text).map(|(_, v)| *v).unwrap_or(TokenType::Identifier);
+        self.add_token(token_type, Some(Literal::from(text)));
     }
 
     fn is_at_end(&self) -> bool {
@@ -180,8 +180,8 @@ impl Scanner {
         self.source.chars().nth(self.current + 1).unwrap()
     }
 
-    fn add_token(&mut self, token_type: token::TokenType, literal: Option<token::Literal>) {
-        let text = self.source[self.start..self.current].to_string();
+    fn add_token(&mut self, token_type: token::TokenType, literal: Option<Literal<'a>>) {
+        let text = &self.source[self.start..self.current];
         self.tokens.push(Token::new(token_type, Some(text), literal, self.line));
     }
 }

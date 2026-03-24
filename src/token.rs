@@ -1,3 +1,5 @@
+use crate::token;
+
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum TokenType {
     // Single-character tokens.
@@ -40,45 +42,45 @@ pub static KEYWORDS: [(&str, TokenType); 16] = [
     ("while", TokenType::While),
 ];
 
-
-pub enum Literal {
-    String(String),
+#[derive(Clone)]
+pub enum Literal<'a> {
+    String(&'a str),
     Number(f64),
     Boolean(bool),
     Nil,
 }
 
-impl From<String> for Literal {
-    fn from(value: String) -> Self {
+impl<'a> From<&'a str> for Literal<'a> {
+    fn from(value: &'a str) -> Self {
         Literal::String(value)
     }
 }
 
-impl From<&str> for Literal {
-    fn from(value: &str) -> Self {
-        Literal::String(value.to_string())
-    }
-}
-
-impl From<f64> for Literal {
+impl<'a> From<f64> for Literal<'a> {
     fn from(value: f64) -> Self {
         Literal::Number(value)
     }
 }
 
-impl From<bool> for Literal {
+impl<'a> From<i32> for Literal<'a> {
+    fn from(value: i32) -> Self {
+        Literal::Number(value as f64)
+    }
+}
+
+impl<'a> From<bool> for Literal<'a> {
     fn from(value: bool) -> Self {
         Literal::Boolean(value)
     }
 }
 
-impl Default for Literal {
+impl<'a> Default for Literal<'a> {
     fn default() -> Self {
         Literal::Nil
     }
 }
 
-impl std::fmt::Debug for Literal {
+impl<'a> std::fmt::Debug for Literal<'a> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Literal::String(s) => write!(f, "{}", s),
@@ -89,20 +91,29 @@ impl std::fmt::Debug for Literal {
     }
 }
 
-#[derive(Debug)]
-pub struct Token {
-    token_type: TokenType,
-    lexeme: Option<String>,
-    literal: Option<Literal>,
-    line: usize
+#[derive(Clone, Debug)]
+pub struct Token<'a> {
+    pub token_type: TokenType,
+    pub lexeme: Option<&'a str>,
+    pub literal: Option<Literal<'a>>,
+    pub line: usize
 }
 
-impl Token {
-    pub fn new(token_type: TokenType, lexeme: Option<String>, literal: Option<Literal>, line: usize) -> Self {
+impl<'a> Token<'a> {
+    pub fn new(token_type: TokenType, lexeme: Option<&'a str>, literal: Option<Literal<'a>>, line: usize) -> Self {
         Token {
             token_type,
             lexeme,
             literal,
+            line
+        }
+    }
+
+    pub fn operator(token_type: TokenType, lexeme: Option<&'a str>, line: usize) -> Self {
+        Token {
+            token_type,
+            lexeme,
+            literal: None,
             line
         }
     }
