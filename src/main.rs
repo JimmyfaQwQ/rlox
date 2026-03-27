@@ -3,16 +3,15 @@ use std::fs;
 use std::io::Write;
 
 use layla_log::*;
-    
+
 mod scanner;
 mod token;
 mod error;
 mod expr;
 mod parser;
+mod evaluator;
 
 use scanner::Scanner;
-use expr::Expr;
-use token::Token;
 
 fn run_file(path: &str) {
         let contents = fs::read_to_string(path)
@@ -42,9 +41,9 @@ fn run(source: &str) {
             return;
         }
     };
-    for token in tokens {
-        println!("{:?}", token);
-    }
+    // for token in tokens {
+    //     println!("{:?}", token);
+    // }
     let mut parser = parser::Parser::new(tokens);
     let expr_result = parser.parse();
     let expr = match expr_result {
@@ -55,6 +54,13 @@ fn run(source: &str) {
         }
     };
     println!("{:?}", expr);
+    let eval_result = evaluator::evaluate(&expr);
+    if eval_result.is_err() {
+        println!("Evaluation error: {}", eval_result.clone().err().unwrap());
+        info!("Evaluation error: {}", eval_result.err().unwrap());
+    } else {
+        println!("{:?}", eval_result.ok().unwrap());
+    }
 }
 
 fn main() {
@@ -69,16 +75,4 @@ fn main() {
     } else {
         run_prompt();
     }
-
-    // let expr = Expr::binary(
-    //     Expr::unary(
-    //         Token::operator(token::TokenType::Minus, Some("-"), 1),
-    //         Expr::literal(123.into())
-    //     ),
-    //     Token::operator(token::TokenType::Star, Some("*"), 1),
-    //     Expr::grouping(
-    //         Expr::literal(45.67.into())
-    //     )
-    // );
-    // println!("{:?}", expr);
 }

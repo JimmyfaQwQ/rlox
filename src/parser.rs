@@ -141,6 +141,21 @@ impl Parser {
     fn previous(&self) -> &Token {
         &self.tokens[self.current - 1]
     }
+
+    #[allow(dead_code)]
+    fn synchronize(&mut self) {
+        self.advance();
+        while !self.is_at_end() {
+            if self.previous().token_type == TokenType::Semicolon {
+                return;
+            }
+            match self.peek().token_type {
+                TokenType::Class | TokenType    ::Fun | TokenType::Var | TokenType::For | TokenType::If | TokenType::While | TokenType::Print | TokenType::Return => return,
+                _ => (),
+            }
+            self.advance();
+        }
+    }
 }
 
 impl Parser {
@@ -150,10 +165,11 @@ impl Parser {
     }
 
     fn error(&self, token: &Token, message: &str) {
+        let error_message = format!("Parser error at line {}: {}", token.line, message);
         if token.token_type == TokenType::EOF {
-            universal_error::report(token.line, " at end", message);
+            universal_error::report(token.line, " at end", &error_message);
         } else {
-            universal_error::report(token.line, &format!(" at '{}'", token.lexeme.as_ref().unwrap_or(&Rc::from("unknown"))), message);
+            universal_error::report(token.line, &format!(" at '{}'", token.lexeme.as_ref().unwrap_or(&Rc::from("unknown"))), &error_message);
         }
     }
 }

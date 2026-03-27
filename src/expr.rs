@@ -2,35 +2,35 @@ use std::{fmt::Debug};
 
 use crate::token;
 
-pub struct Binary {
+pub struct BinaryExpr {
     pub left: Box<Expr>,
     pub operator: token::Token,
     pub right: Box<Expr>,
 } 
 
-pub struct Grouping {
+pub struct GroupingExpr {
     pub expression: Box<Expr>,
 }
 
-pub struct Literal {
+pub struct LiteralExpr {
     pub value: token::Literal,
 }
 
-pub struct Unary {
+pub struct UnaryExpr {
     pub operator: token::Token,
     pub right: Box<Expr>
 }
 
 pub enum Expr {
-    Binary(Binary),
-    Grouping(Grouping),
-    Literal(Literal),
-    Unary(Unary),
+    BinaryExprs(BinaryExpr),
+    GroupingExprs(GroupingExpr),
+    LiteralExprs(LiteralExpr),
+    UnaryExprs(UnaryExpr),
 }
 
 impl Expr {
     pub fn binary(left: Expr, operator: token::Token, right: Expr) -> Self {
-        Expr::Binary(Binary {
+        Expr::BinaryExprs(BinaryExpr {
             left: Box::new(left),
             operator: operator,
             right: Box::new(right),
@@ -38,19 +38,19 @@ impl Expr {
     }
 
     pub fn grouping(expression: Expr) -> Self {
-        Expr::Grouping(Grouping {
+        Expr::GroupingExprs(GroupingExpr {
             expression: Box::new(expression),
         })
     }
 
     pub fn literal(value: token::Literal) -> Self {
-        Expr::Literal(Literal {
+        Expr::LiteralExprs(LiteralExpr {
             value: value,
         })
     }
 
     pub fn unary(operator: token::Token, right: Expr) -> Self {
-        Expr::Unary(Unary {
+        Expr::UnaryExprs(UnaryExpr {
             operator: operator,
             right: Box::new(right),
         })
@@ -60,10 +60,10 @@ impl Expr {
 impl Expr {
     pub fn pretty_print(&self) -> String {
         match self {
-            Expr::Binary(binary) => format!("({} {} {})", binary.operator.lexeme.as_ref().unwrap(), binary.left.pretty_print(), binary.right.pretty_print()),
-            Expr::Grouping(grouping) => format!("(group {})", grouping.expression.pretty_print()),
-            Expr::Literal(literal) => format!("{:?}", literal.value),
-            Expr::Unary(unary) => format!("({} {})", unary.operator.lexeme.as_ref().unwrap(), unary.right.pretty_print()),
+            Expr::BinaryExprs(binary) => format!("({} {} {})", binary.operator.lexeme.as_ref().unwrap(), binary.left.pretty_print(), binary.right.pretty_print()),
+            Expr::GroupingExprs(grouping) => format!("(group {})", grouping.expression.pretty_print()),
+            Expr::LiteralExprs(literal) => format!("{:?}", literal.value),
+            Expr::UnaryExprs(unary) => format!("({} {})", unary.operator.lexeme.as_ref().unwrap(), unary.right.pretty_print()),
         }
     }
 }

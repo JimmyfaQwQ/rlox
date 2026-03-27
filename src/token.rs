@@ -109,6 +109,7 @@ impl Token {
         }
     }
 
+    #[allow(dead_code)]
     pub fn operator(token_type: TokenType, lexeme: Option<&str>, line: usize) -> Self {
         Token {
             token_type,
