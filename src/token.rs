@@ -50,6 +50,17 @@ pub enum Literal {
     Nil,
 }
 
+impl Literal {
+    pub fn get_type(&self) -> &'static str {
+        match self {
+            Literal::String(_) => "string",
+            Literal::Number(_) => "number",
+            Literal::Boolean(_) => "boolean",
+            Literal::Nil => "nil",
+        }
+    }
+}
+
 impl From<&str> for Literal {
     fn from(value: &str) -> Self {
         Literal::String(Rc::from(value))

@@ -56,7 +56,6 @@ fn run(source: &str) {
     println!("{:?}", expr);
     let eval_result = evaluator::evaluate(&expr);
     if eval_result.is_err() {
-        println!("Evaluation error: {}", eval_result.clone().err().unwrap());
         info!("Evaluation error: {}", eval_result.err().unwrap());
     } else {
         println!("{:?}", eval_result.ok().unwrap());

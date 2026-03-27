@@ -1,6 +1,6 @@
 use crate::token::{Token, TokenType, Literal};
 use crate::expr::Expr;
-use crate::error as universal_error;
+use crate::error::error_at_token;
 use std::result::Result;
 use std::rc::Rc;
 
@@ -87,21 +87,18 @@ impl Parser {
             match literal {
                 Some(literal) => return Ok(Expr::literal(literal)),
                 None => { 
-                    self.error(self.previous(), "Expected literal value.");
-                    return Err("Expected literal value.");
+                    return Err(self.error(self.previous(), "Expected literal value."));
                 },
             }
         }
         if self.match_token(&[TokenType::LeftParen]) {
             let expr = self.expression()?;
             if !self.match_token(&[TokenType::RightParen]) {
-                self.error(self.peek(), "Expected ')' after expression.");
-                return Err("Expected ')' after expression.");
+                return Err(self.error(self.previous(), "Expected ')' after expression."));
             }
             return Ok(Expr::grouping(expr));
         }
-        self.error(self.peek(), "Expected expression.");
-        Err("Expected expression.")
+        Err(self.error(self.peek(), "Expected expression."))
     }
 }
 
@@ -164,12 +161,8 @@ impl Parser {
         self.expression()
     }
 
-    fn error(&self, token: &Token, message: &str) {
-        let error_message = format!("Parser error at line {}: {}", token.line, message);
-        if token.token_type == TokenType::EOF {
-            universal_error::report(token.line, " at end", &error_message);
-        } else {
-            universal_error::report(token.line, &format!(" at '{}'", token.lexeme.as_ref().unwrap_or(&Rc::from("unknown"))), &error_message);
-        }
+    fn error<'a> (&self, token: &Token, message: &'a str) -> &'a str {
+        error_at_token(token, message);
+        message
     }
 }

@@ -60,10 +60,17 @@ impl Expr {
 impl Expr {
     pub fn pretty_print(&self) -> String {
         match self {
-            Expr::BinaryExprs(binary) => format!("({} {} {})", binary.operator.lexeme.as_ref().unwrap(), binary.left.pretty_print(), binary.right.pretty_print()),
+            Expr::BinaryExprs(binary) => format!("(operator({}) {} {})", 
+                binary.operator.lexeme.as_ref().unwrap(),
+                binary.left.pretty_print(),
+                binary.right.pretty_print()
+            ),
             Expr::GroupingExprs(grouping) => format!("(group {})", grouping.expression.pretty_print()),
-            Expr::LiteralExprs(literal) => format!("{:?}", literal.value),
-            Expr::UnaryExprs(unary) => format!("({} {})", unary.operator.lexeme.as_ref().unwrap(), unary.right.pretty_print()),
+            Expr::LiteralExprs(literal) => format!("{}({:?})", literal.value.get_type(), literal.value),
+            Expr::UnaryExprs(unary) => format!("(operator({}) {})", 
+                unary.operator.lexeme.as_ref().unwrap(),
+                unary.right.pretty_print()
+            ),
         }
     }
 }
