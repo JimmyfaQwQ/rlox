@@ -8,8 +8,9 @@ mod scanner;
 mod token;
 mod error;
 mod expr;
+mod stmt;
 mod parser;
-mod evaluator;
+mod interpreter;
 
 
 fn run_file(path: &str) {
@@ -50,20 +51,16 @@ fn run(source: &str) {
     //     println!("{:?}", token);
     // }
     let mut parser = parser::Parser::new(tokens);
-    let expr_result = parser.parse();
-    let expr = match expr_result {
-        Ok(expr) => expr,
-        Err(e) => {
-            info!("Parser error: {}", e);
-            return;
-        }
-    };
-    // println!("{:?}", expr);
-    let eval_result = evaluator::evaluate(&expr);
-    if eval_result.is_err() {
-        info!("Evaluation error: {}", eval_result.err().unwrap());
-    } else {
-        println!("{:?}", eval_result.ok().unwrap());
+    let statements = parser.parse();
+    if statements.is_err() {
+        info!("Parser error: {}", statements.err().unwrap());
+        return;
+    }
+    let statements = statements.ok().unwrap();
+    let interpret_result = interpreter::interpret(statements);
+    if interpret_result.is_err() {
+        info!("Runtime error: {}", interpret_result.err().unwrap());
+        return;
     }
 }
 

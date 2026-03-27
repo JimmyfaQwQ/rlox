@@ -1,10 +1,11 @@
 use crate::expr::Expr;
+use crate::stmt::Stmt;
 use crate::token::{Token, TokenType, Literal};
 use crate::error::{error_at_token};
 use std::result::Result;
 use std::rc::Rc;
 
-pub fn evaluate(expr: &Expr) -> Result<Literal, Rc<str>> {
+fn evaluate(expr: &Expr) -> Result<Literal, Rc<str>> {
     match expr {
         Expr::LiteralExprs(literal_expr) => Ok(literal_expr.value.clone()),
         Expr::GroupingExprs(grouping_expr) => evaluate(&grouping_expr.expression),
@@ -31,7 +32,7 @@ pub fn evaluate(expr: &Expr) -> Result<Literal, Rc<str>> {
                     match (&left, &right) {
                         (Literal::Number(l), Literal::Number(r)) => Ok(Literal::Number(l + r)),
                         (Literal::String(l), Literal::String(r)) => Ok(Literal::String(Rc::from(format!("{}{}", l, r)))),
-                        _ => Err(error_from_string(&binary_expr.operator, format!("Operands must be two {} or two {}, found: {}({:?}) and {}({:?})", left.get_type(), right.get_type(), left.get_type(), left, right.get_type(), right))),
+                        _ => Err(error_from_string(&binary_expr.operator, format!("Operands must be two numbers or two strings, found: {}({:?}) and {}({:?})", left.get_type(), left, right.get_type(), right))),
                     }
                 },
                 TokenType::Minus => {
@@ -103,6 +104,27 @@ pub fn evaluate(expr: &Expr) -> Result<Literal, Rc<str>> {
                 },
                 _ => Err(error_from_string(&binary_expr.operator, format!("Invalid binary operator: {}", binary_expr.operator.lexeme.as_ref().unwrap()))),
             }
+        },
+    }
+}
+
+pub fn interpret(stmt: Rc<[Stmt]>) -> Result<(), Rc<str>> {
+    for statement in stmt.iter() {
+        execute(statement)?;
+    }
+    Ok(())
+}
+
+fn execute(stmt: &Stmt) -> Result<(), Rc<str>> {
+    match stmt {
+        Stmt::Expression(expr_stmt) => {
+            evaluate(&expr_stmt.expression)?;
+            Ok(())
+        },
+        Stmt::Print(print_stmt) => {
+            let value = evaluate(&print_stmt.expression)?;
+            println!("{:?}", value);
+            Ok(())
         },
     }
 }

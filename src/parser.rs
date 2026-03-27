@@ -1,5 +1,6 @@
 use crate::token::{Token, TokenType, Literal};
 use crate::expr::Expr;
+use crate::stmt::Stmt;
 use crate::error::error_at_token;
 use std::result::Result;
 use std::rc::Rc;
@@ -93,9 +94,7 @@ impl Parser {
         }
         if self.match_token(&[TokenType::LeftParen]) {
             let expr = self.expression()?;
-            if !self.match_token(&[TokenType::RightParen]) {
-                return Err(self.error(self.previous(), "Expected ')' after expression."));
-            }
+            self.consume(&TokenType::RightParen, "Expected ')' after expression.")?;
             return Ok(Expr::grouping(expr));
         }
         Err(self.error(self.peek(), "Expected expression."))
@@ -139,7 +138,34 @@ impl Parser {
         &self.tokens[self.current - 1]
     }
 
-    #[allow(dead_code)]
+    fn consume<'a> (&mut self, token_type: &TokenType, message: &'a str) -> Result<&Token, &'a str> {
+        if self.check(token_type) {
+            return Ok(self.advance());
+        }
+        Err(self.error(self.peek(), message))
+    }
+}
+
+impl Parser {
+    fn statement(&mut self) -> Result<Stmt, &'static str> {
+        if self.match_token(&[TokenType::Print]) {
+            return self.print_statement();
+        }
+        self.expression_statement()
+    }
+
+    fn print_statement(&mut self) -> Result<Stmt, &'static str> {
+        let value = self.expression()?;
+        self.consume(&TokenType::Semicolon, "Expected ';' after value.")?;
+        Ok(Stmt::print_stmt(value))
+    }
+
+    fn expression_statement(&mut self) -> Result<Stmt, &'static str> {
+        let expr = self.expression()?;
+        self.consume(&TokenType::Semicolon, "Expected ';' after expression.")?;
+        Ok(Stmt::expression_stmt(expr))
+    }
+
     fn synchronize(&mut self) {
         self.advance();
         while !self.is_at_end() {
@@ -156,9 +182,19 @@ impl Parser {
 }
 
 impl Parser {
-    pub fn parse(&mut self) -> Result<Expr, &'static str> {
+    pub fn parse(&mut self) -> Result<Rc<[Stmt]>, &'static str> {
         self.current = 0;
-        self.expression()
+        let mut statements: Vec<Stmt> = Vec::new();
+        while !self.is_at_end() {
+            match self.statement() {
+                Ok(stmt) => statements.push(stmt),
+                Err(e) => {
+                    self.synchronize();
+                    return Err(e);
+                },
+            }
+        }
+        Ok(Rc::from(statements))
     }
 
     fn error<'a> (&self, token: &Token, message: &'a str) -> &'a str {
