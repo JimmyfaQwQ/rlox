@@ -85,6 +85,18 @@ impl From<bool> for Literal {
     }
 }
 
+impl PartialEq for Literal {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Literal::String(s1), Literal::String(s2)) => s1 == s2,
+            (Literal::Number(n1), Literal::Number(n2)) => n1 == n2,
+            (Literal::Boolean(b1), Literal::Boolean(b2)) => b1 == b2,
+            (Literal::Nil, Literal::Nil) => true,
+            _ => false,
+        }
+    }
+}
+
 impl Default for Literal {
     fn default() -> Self {
         Literal::Nil

@@ -11,7 +11,6 @@ mod expr;
 mod parser;
 mod evaluator;
 
-use scanner::Scanner;
 
 fn run_file(path: &str) {
         let contents = fs::read_to_string(path)
@@ -26,13 +25,19 @@ fn run_prompt() {
         io::stdout().flush().expect("Failed to flush stdout.");
         io::stdin().read_line(&mut line)
             .expect("Failed to read new line of input");
+        if line.trim().is_empty() {
+            continue;
+        }
+        if line.trim() == "exit" {
+            break;
+        }
         run(&line);
         line.clear();
     }
 }
 
 fn run(source: &str) {
-    let mut scanner = Scanner::new(source);
+    let mut scanner = scanner::Scanner::new(source);
     let tokens_result = scanner.scan_tokens();
     let tokens = match tokens_result {
         Ok(tokens) => tokens,
@@ -53,7 +58,7 @@ fn run(source: &str) {
             return;
         }
     };
-    println!("{:?}", expr);
+    // println!("{:?}", expr);
     let eval_result = evaluator::evaluate(&expr);
     if eval_result.is_err() {
         info!("Evaluation error: {}", eval_result.err().unwrap());

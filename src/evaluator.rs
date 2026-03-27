@@ -59,6 +59,48 @@ pub fn evaluate(expr: &Expr) -> Result<Literal, Rc<str>> {
                         Err(error_from_string(&binary_expr.operator, format!("Operands must be numbers, found: {}({:?}) and {}({:?})", left.get_type(), left, right.get_type(), right)))
                     }
                 },
+                TokenType::EqualEqual => {
+                    if left.get_type() == right.get_type() {
+                        Ok(Literal::Boolean(left == right))
+                    } else {
+                        Err(error_from_string(&binary_expr.operator, format!("Operands must be of the same type for equality comparison, found: {}({:?}) and {}({:?})", left.get_type(), left, right.get_type(), right)))
+                    }
+                },
+                TokenType::BangEqual => {
+                    if left.get_type() == right.get_type() {
+                        Ok(Literal::Boolean(left != right))
+                    } else {
+                        Err(error_from_string(&binary_expr.operator, format!("Operands must be of the same type for inequality comparison, found: {}({:?}) and {}({:?})", left.get_type(), left, right.get_type(), right)))
+                    }
+                },
+                TokenType::Greater => {
+                    if let (Literal::Number(l), Literal::Number(r)) = (&left, &right) {
+                        Ok(Literal::Boolean(l > r))
+                    } else {
+                        Err(error_from_string(&binary_expr.operator, format!("Operands must be numbers for '>' comparison, found: {}({:?}) and {}({:?})", left.get_type(), left, right.get_type(), right)))
+                    }
+                },
+                TokenType::GreaterEqual => {
+                    if let (Literal::Number(l), Literal::Number(r)) = (&left, &right) {
+                        Ok(Literal::Boolean(l >= r))
+                    } else {
+                        Err(error_from_string(&binary_expr.operator, format!("Operands must be numbers for '>=' comparison, found: {}({:?}) and {}({:?})", left.get_type(), left, right.get_type(), right)))
+                    }
+                },
+                TokenType::Less => {
+                    if let (Literal::Number(l), Literal::Number(r)) = (&left, &right) {
+                        Ok(Literal::Boolean(l < r))
+                    } else {
+                        Err(error_from_string(&binary_expr.operator, format!("Operands must be numbers for '<' comparison, found: {}({:?}) and {}({:?})", left.get_type(), left, right.get_type(), right)))
+                    }
+                },
+                TokenType::LessEqual => {
+                    if let (Literal::Number(l), Literal::Number(r)) = (&left, &right) {
+                        Ok(Literal::Boolean(l <= r))
+                    } else {
+                        Err(error_from_string(&binary_expr.operator, format!("Operands must be numbers for '<=' comparison, found: {}({:?}) and {}({:?})", left.get_type(), left, right.get_type(), right)))
+                    }
+                },
                 _ => Err(error_from_string(&binary_expr.operator, format!("Invalid binary operator: {}", binary_expr.operator.lexeme.as_ref().unwrap()))),
             }
         },
@@ -74,11 +116,11 @@ fn is_truthy(literal: &Literal) -> bool {
 }
 
 fn error<'a> (token: &Token, message: &'a str) -> Rc<str> {
-    error_at_token(token, message);
+    error_at_token(token, "Runtime", message);
     Rc::from(message)
 }
 
 fn error_from_string(token: &Token, message: String) -> Rc<str> {
-    error_at_token(token, message.as_str());
+    error_at_token(token, "Runtime", message.as_str());
     Rc::from(message)
 }

@@ -99,7 +99,7 @@ impl Scanner {
             '0'..='9' => self.number(),
             'a'..='z' | 'A'..='Z' | '_' => self.identifier(),
             _ => { 
-                error(self.line, "Unexpected character.");
+                error(self.line, "Scanner", "Unexpected character.");
                 return Err("The scanner encountered unexpected character.");
             }
         }
@@ -114,7 +114,7 @@ impl Scanner {
             self.advance();
         }
         if self.is_at_end() {
-            error(self.line, "Unterminated string.");
+            error(self.line, "Scanner", "Unterminated string.");
             return;
         }
         self.advance();

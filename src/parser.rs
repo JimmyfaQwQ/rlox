@@ -162,7 +162,7 @@ impl Parser {
     }
 
     fn error<'a> (&self, token: &Token, message: &'a str) -> &'a str {
-        error_at_token(token, message);
+        error_at_token(token, "Syntax", message);
         message
     }
 }
