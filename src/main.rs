@@ -11,18 +11,21 @@ mod expr;
 mod stmt;
 mod parser;
 mod interpreter;
+mod enviorment;
 
 
 fn run_file(path: &str) {
+    let mut env = enviorment::Enviorment::new(None);
     let contents = fs::read_to_string(path)
         .expect("Something went wrong loading the script");
-    if let Err(e) = run(&contents) {
+    if let Err(e) = run(&contents, &mut env) {
         std::process::exit(e.exit_code());
     }
 }
 
 fn run_prompt() {
     let mut line = String::new();
+    let mut env = enviorment::Enviorment::new(None);
     loop {
         print!("> ");
         io::stdout().flush().expect("Failed to flush stdout.");
@@ -34,17 +37,17 @@ fn run_prompt() {
         if line.trim() == "exit" {
             break;
         }
-        if let Err(e) = run(&line) {
+        if let Err(e) = run(&line, &mut env) {
             info!("{:?}", e);
         }
         line.clear();
     }
 }
 
-fn run(source: &str) -> Result<(), error::Error> {
+fn run(source: &str, env: &mut enviorment::Enviorment) -> Result<(), error::Error> {
     let tokens = scanner::scan_tokens(source)?;
     let statements = parser::Parser::new(tokens).parse()?;
-    interpreter::interpret(&statements)
+    interpreter::interpret(&statements, env)
 }
 
 fn main() {

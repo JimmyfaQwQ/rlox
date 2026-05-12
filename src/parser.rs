@@ -18,7 +18,42 @@ impl Parser {
 
 impl Parser {
     fn expression(&mut self) -> Result<Expr, Error> {
-        self.equality()
+        self.assignment()
+    }
+
+    fn assignment(&mut self) -> Result<Expr, Error> {
+        let expr = self.or()?;
+        if self.match_token(&[TokenType::Equal]) {
+            let equals = self.take_previous();
+            let value = self.assignment()?;
+            if let Expr::VariableExprs(variable_expr) = expr {
+                let name = variable_expr.name;
+                return Ok(Expr::assign(name, value));
+            }
+            error_at_token(&equals, "Syntax", "Invalid assignment target.");
+            return Err(Error::Parser);
+        }
+        Ok(expr)
+    }
+
+    fn or(&mut self) -> Result<Expr, Error> {
+        let mut expr = self.and()?;
+        while self.match_token(&[TokenType::Or]) {
+            let operator = self.take_previous();
+            let right = self.and()?;
+            expr = Expr::logical(expr, operator, right);
+        }
+        Ok(expr)
+    }
+
+    fn and(&mut self) -> Result<Expr, Error> {
+        let mut expr = self.equality()?;
+        while self.match_token(&[TokenType::And]) {
+            let operator = self.take_previous();
+            let right = self.equality()?;
+            expr = Expr::logical(expr, operator, right);
+        }
+        Ok(expr)
     }
 
     fn equality(&mut self) -> Result<Expr, Error> {
@@ -90,6 +125,10 @@ impl Parser {
                 }
             }
         }
+        if self.match_token(&[TokenType::Identifier]) {
+            let name = self.take_previous();
+            return Ok(Expr::variable(name));
+        }
         if self.match_token(&[TokenType::LeftParen]) {
             let expr = self.expression()?;
             self.consume(TokenType::RightParen, "Expected ')' after expression.")?;
@@ -152,6 +191,17 @@ impl Parser {
         Err(Error::Parser)
     }
 
+    fn digest(&mut self, token_type: TokenType, message: &str) -> Result<Token, Error> {
+        if self.check(token_type) {
+            if !self.is_at_end() {
+                self.current += 1;
+            }
+            return Ok(self.take_previous());
+        }
+        self.error_at_peek(message);
+        Err(Error::Parser)
+    }
+
     fn error_at_peek(&self, message: &str) {
         error_at_token(self.peek(), "Syntax", message);
     }
@@ -166,13 +216,88 @@ impl Parser {
         if self.match_token(&[TokenType::Print]) {
             return self.print_statement();
         }
+        if self.match_token(&[TokenType::LeftBrace]) {
+            return Ok(Stmt::block_stmt(self.block()?));
+        }
+        if self.match_token(&[TokenType::If]) {
+            return self.if_statement();
+        }
+        if self.match_token(&[TokenType::While]) {
+            return self.while_statement();
+        }
+        if self.match_token(&[TokenType::For]) {
+            return self.for_statement();
+        }
         self.expression_statement()
+    }
+
+    fn block(&mut self) -> Result<Vec<Stmt>, Error> {
+        let mut statements: Vec<Stmt> = Vec::new();
+        while !self.check(TokenType::RightBrace) && !self.is_at_end() {
+            statements.push(self.declaration()?);
+        }
+        self.consume(TokenType::RightBrace, "Expected '}' after block.")?;
+        Ok(statements)
     }
 
     fn print_statement(&mut self) -> Result<Stmt, Error> {
         let value = self.expression()?;
         self.consume(TokenType::Semicolon, "Expected ';' after value.")?;
         Ok(Stmt::print_stmt(value))
+    }
+
+    fn if_statement(&mut self) -> Result<Stmt, Error> {
+        self.consume(TokenType::LeftParen, "Expected '(' after 'if'.")?;
+        let condition = self.expression()?;
+        self.consume(TokenType::RightParen, "Expected ')' after if condition.")?;
+        let then_branch = self.statement()?;
+        let else_branch = if self.match_token(&[TokenType::Else]) {
+            Some(self.statement()?)
+        } else {
+            None
+        };
+        Ok(Stmt::if_stmt(condition, then_branch, else_branch))
+    }
+
+    fn while_statement(&mut self) -> Result<Stmt, Error> {
+        self.consume(TokenType::LeftParen, "Expected '(' after 'while'.")?;
+        let condition = self.expression()?;
+        self.consume(TokenType::RightParen, "Expected ')' after condition.")?;
+        let body = self.statement()?;
+        Ok(Stmt::while_stmt(condition, body))
+    }
+
+    fn for_statement(&mut self) -> Result<Stmt, Error> {
+        self.consume(TokenType::LeftParen, "Expected '(' after 'for'.")?;
+        let initializer = if self.match_token(&[TokenType::Semicolon]) {
+            None
+        } else if self.match_token(&[TokenType::Var]) {
+            Some(self.var_declaration()?)
+        } else {
+            Some(self.expression_statement()?)
+        };
+        let condition = if !self.check(TokenType::Semicolon) {
+            Some(self.expression()?)
+        } else {
+            None
+        };
+        self.consume(TokenType::Semicolon, "Expected ';' after loop condition.")?;
+        let increment = if !self.check(TokenType::RightParen) {
+            Some(self.expression()?)
+        } else {
+            None
+        };
+        self.consume(TokenType::RightParen, "Expected ')' after for clauses.")?;
+        let mut body = self.statement()?;
+        if let Some(increment) = increment {
+            body = Stmt::block_stmt(vec![body, Stmt::expression_stmt(increment)]);
+        }
+        let condition = condition.unwrap_or_else(|| Expr::literal(Literal::Boolean(true)));
+        body = Stmt::while_stmt(condition, body);
+        if let Some(initializer) = initializer {
+            body = Stmt::block_stmt(vec![initializer, body]);
+        }
+        Ok(body)
     }
 
     fn expression_statement(&mut self) -> Result<Stmt, Error> {
@@ -197,11 +322,31 @@ impl Parser {
 }
 
 impl Parser {
+    fn declaration(&mut self) -> Result<Stmt, Error> {
+        if self.match_token(&[TokenType::Var]) {
+            return self.var_declaration();
+        }
+        self.statement()
+    }
+
+    fn var_declaration(&mut self) -> Result<Stmt, Error> {
+        let name = self.digest(TokenType::Identifier, "Expected variable name.")?;
+        let initializer = if self.match_token(&[TokenType::Equal]) {
+            Some(self.expression()?)
+        } else {
+            None
+        };
+        self.consume(TokenType::Semicolon, "Expected ';' after variable declaration.")?;
+        Ok(Stmt::var_stmt(name, initializer))
+    }
+}
+
+impl Parser {
     pub fn parse(&mut self) -> Result<Vec<Stmt>, Error> {
         self.current = 0;
         let mut statements: Vec<Stmt> = Vec::new();
         while !self.is_at_end() {
-            match self.statement() {
+            match self.declaration() {
                 Ok(stmt) => statements.push(stmt),
                 Err(e) => {
                     self.synchronize();
