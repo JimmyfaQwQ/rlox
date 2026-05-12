@@ -1,4 +1,5 @@
-use crate::token::{Token, TokenType, Literal};
+use crate::token::{Token, TokenType};
+use crate::object::Object;
 use crate::expr::Expr;
 use crate::stmt::Stmt;
 use crate::error::{error_at_token, Error};
@@ -102,18 +103,48 @@ impl Parser {
             let right = self.unary()?;
             return Ok(Expr::unary(operator, right));
         }
-        self.primary()
+        self.call()
+    }
+
+    fn call(&mut self) -> Result<Expr, Error> {
+        let mut expr = self.primary()?;
+        loop {
+            if self.match_token(&[TokenType::LeftParen]) {
+                expr = self.finish_call(expr)?;
+            } else {
+                break;
+            }
+        }
+        Ok(expr)
+    }
+
+    fn finish_call(&mut self, callee: Expr) -> Result<Expr, Error> {
+        let mut arguments: Vec<Expr> = Vec::new();
+        if !self.check(TokenType::RightParen) {
+            loop {
+                if arguments.len() >= 255 {
+                    self.error_at_peek("Can't have more than 255 arguments.");
+                    return Err(Error::Parser);
+                }
+                arguments.push(self.expression()?);
+                if !self.match_token(&[TokenType::Comma]) {
+                    break;
+                }
+            }
+        }
+        let paren = self.digest(TokenType::RightParen, "Expected ')' after arguments.")?;
+        Ok(Expr::call(callee, paren, arguments))
     }
 
     fn primary(&mut self) -> Result<Expr, Error> {
         if self.match_token(&[TokenType::False]) {
-            return Ok(Expr::literal(Literal::Boolean(false)));
+            return Ok(Expr::literal(Object::Boolean(false)));
         }
         if self.match_token(&[TokenType::True]) {
-            return Ok(Expr::literal(Literal::Boolean(true)));
+            return Ok(Expr::literal(Object::Boolean(true)));
         }
         if self.match_token(&[TokenType::Nil]) {
-            return Ok(Expr::literal(Literal::Nil));
+            return Ok(Expr::literal(Object::Nil));
         }
         if self.match_token(&[TokenType::Number, TokenType::String]) {
             let literal = mem::take(&mut self.tokens[self.current - 1].literal);
@@ -292,7 +323,7 @@ impl Parser {
         if let Some(increment) = increment {
             body = Stmt::block_stmt(vec![body, Stmt::expression_stmt(increment)]);
         }
-        let condition = condition.unwrap_or_else(|| Expr::literal(Literal::Boolean(true)));
+        let condition = condition.unwrap_or_else(|| Expr::literal(Object::Boolean(true)));
         body = Stmt::while_stmt(condition, body);
         if let Some(initializer) = initializer {
             body = Stmt::block_stmt(vec![initializer, body]);

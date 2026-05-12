@@ -12,6 +12,8 @@ mod stmt;
 mod parser;
 mod interpreter;
 mod enviorment;
+mod callable;
+mod object;
 
 
 fn run_file(path: &str) {

@@ -1,4 +1,4 @@
-use std::rc::Rc;
+use crate::object::Object;
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum TokenType {
@@ -66,89 +66,17 @@ fn fixed_lexeme(t: TokenType) -> &'static str {
     }
 }
 
-#[derive(Clone)]
-pub enum Literal {
-    String(Rc<str>),
-    Number(f64),
-    Boolean(bool),
-    Nil,
-}
-
-impl Literal {
-    pub fn get_type(&self) -> &'static str {
-        match self {
-            Literal::String(_) => "string",
-            Literal::Number(_) => "number",
-            Literal::Boolean(_) => "boolean",
-            Literal::Nil => "nil",
-        }
-    }
-}
-
-impl From<&str> for Literal {
-    fn from(value: &str) -> Self {
-        Literal::String(Rc::from(value))
-    }
-}
-
-impl From<f64> for Literal {
-    fn from(value: f64) -> Self {
-        Literal::Number(value)
-    }
-}
-
-impl From<i32> for Literal {
-    fn from(value: i32) -> Self {
-        Literal::Number(value as f64)
-    }
-}
-
-impl From<bool> for Literal {
-    fn from(value: bool) -> Self {
-        Literal::Boolean(value)
-    }
-}
-
-impl PartialEq for Literal {
-    fn eq(&self, other: &Self) -> bool {
-        match (self, other) {
-            (Literal::String(s1), Literal::String(s2)) => s1 == s2,
-            (Literal::Number(n1), Literal::Number(n2)) => n1 == n2,
-            (Literal::Boolean(b1), Literal::Boolean(b2)) => b1 == b2,
-            (Literal::Nil, Literal::Nil) => true,
-            _ => false,
-        }
-    }
-}
-
-impl Default for Literal {
-    fn default() -> Self {
-        Literal::Nil
-    }
-}
-
-impl std::fmt::Debug for Literal {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Literal::String(s) => write!(f, "{}", s),
-            Literal::Number(n) => write!(f, "{}", n),
-            Literal::Boolean(b) => write!(f, "{}", b),
-            Literal::Nil => write!(f, "nil"),
-        }
-    }
-}
-
 #[derive(Clone, Debug)]
 pub struct Token {
     pub token_type: TokenType,
     // Only populated for Identifier/String/Number; other token types derive lexeme from token_type.
     pub lexeme: Option<Box<str>>,
-    pub literal: Option<Literal>,
+    pub literal: Option<Object>,
     pub line: usize,
 }
 
 impl Token {
-    pub fn new(token_type: TokenType, lexeme: Option<&str>, literal: Option<Literal>, line: usize) -> Self {
+    pub fn new(token_type: TokenType, lexeme: Option<&str>, literal: Option<Object>, line: usize) -> Self {
         Token {
             token_type,
             lexeme: lexeme.map(Box::from),

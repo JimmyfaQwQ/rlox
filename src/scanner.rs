@@ -1,4 +1,5 @@
-use crate::token::{self, Token, Literal, TokenType};
+use crate::token::{self, Token, TokenType};
+use crate::object::Object;
 use crate::error::{error, Error};
 use std::result::Result;
 
@@ -91,7 +92,7 @@ impl<'a> ScanState<'a> {
         }
         self.advance();
         let value = &self.source[self.start + 1..self.current - 1];
-        let literal = Literal::from(value);
+        let literal = Object::from(value);
         self.add_token(TokenType::String, Some(literal));
     }
 
@@ -106,7 +107,7 @@ impl<'a> ScanState<'a> {
             }
         }
         let value = self.source[self.start..self.current].parse::<f64>().unwrap();
-        self.add_token(TokenType::Number, Some(Literal::from(value)));
+        self.add_token(TokenType::Number, Some(Object::from(value)));
     }
 
     fn identifier(&mut self) {
@@ -156,7 +157,7 @@ impl<'a> ScanState<'a> {
         self.source.as_bytes()[self.current + 1]
     }
 
-    fn add_token(&mut self, token_type: TokenType, literal: Option<Literal>) {
+    fn add_token(&mut self, token_type: TokenType, literal: Option<Object>) {
         let lexeme = match token_type {
             TokenType::Identifier | TokenType::String | TokenType::Number => {
                 Some(&self.source[self.start..self.current])

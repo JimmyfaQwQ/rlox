@@ -1,6 +1,6 @@
 use std::fmt::Debug;
 
-use crate::token;
+use crate::{object, token};
 
 pub struct AssignExpr {
     pub name: token::Token,
@@ -13,12 +13,18 @@ pub struct BinaryExpr {
     pub right: Box<Expr>,
 }
 
+pub struct CallExpr {
+    pub callee: Box<Expr>,
+    pub paren: token::Token,
+    pub arguments: Vec<Expr>,
+}
+
 pub struct GroupingExpr {
     pub expression: Box<Expr>,
 }
 
 pub struct LiteralExpr {
-    pub value: token::Literal,
+    pub value: object::Object,
 }
 pub struct LogicalExpr {
     pub left: Box<Expr>,
@@ -37,6 +43,7 @@ pub struct VariableExpr {
 
 pub enum Expr {
     BinaryExprs(BinaryExpr),
+    CallExprs(CallExpr),
     GroupingExprs(GroupingExpr),
     LiteralExprs(LiteralExpr),
     LogicalExprs(LogicalExpr),
@@ -54,13 +61,21 @@ impl Expr {
         })
     }
 
+    pub fn call(callee: Expr, paren: token::Token, arguments: Vec<Expr>) -> Self {
+        Expr::CallExprs(CallExpr {
+            callee: Box::new(callee),
+            paren,
+            arguments,
+        })
+    }
+
     pub fn grouping(expression: Expr) -> Self {
         Expr::GroupingExprs(GroupingExpr {
             expression: Box::new(expression),
         })
     }
 
-    pub fn literal(value: token::Literal) -> Self {
+    pub fn literal(value: object::Object) -> Self {
         Expr::LiteralExprs(LiteralExpr { value })
     }
 
@@ -99,6 +114,10 @@ impl Expr {
                 binary.left.pretty_print(),
                 binary.right.pretty_print()
             ),
+            Expr::CallExprs(call) => {
+                let args = call.arguments.iter().map(|arg| arg.pretty_print()).collect::<Vec<_>>().join(", ");
+                format!("(call {} {})", call.callee.pretty_print(), args)
+            },
             Expr::GroupingExprs(grouping) => format!("(group {})", grouping.expression.pretty_print()),
             Expr::LiteralExprs(literal) => format!("{}({:?})", literal.value.get_type(), literal.value),
             Expr::LogicalExprs(logical) => format!("(operator({}) {} {})",
@@ -125,18 +144,20 @@ impl Debug for Expr {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use crate::object;
+
+use super::*;
 
     #[test]
     fn test_expr_pretty_print() {
         let expr = Expr::binary(
             Expr::unary(
                 token::Token::operator(token::TokenType::Minus, 1),
-                Expr::literal(token::Literal::Number(123.0)),
+                Expr::literal(object::Object::Number(123.0)),
             ),
             token::Token::operator(token::TokenType::Star, 1),
             Expr::grouping(
-                Expr::literal(token::Literal::Number(45.67)),
+                Expr::literal(object::Object::Number(45.67)),
             ),
         );
         assert_eq!(expr.pretty_print(), "(operator(*) (operator(-) number(123)) (group number(45.67)))");
