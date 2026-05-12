@@ -22,25 +22,49 @@ pub enum TokenType {
     EOF
 }
 
+pub fn keyword_token(s: &str) -> Option<TokenType> {
+    use TokenType::*;
+    Some(match s {
+        "and"    => And,
+        "class"  => Class,
+        "else"   => Else,
+        "false"  => False,
+        "fun"    => Fun,
+        "for"    => For,
+        "if"     => If,
+        "nil"    => Nil,
+        "or"     => Or,
+        "print"  => Print,
+        "return" => Return,
+        "super"  => Super,
+        "this"   => This,
+        "true"   => True,
+        "var"    => Var,
+        "while"  => While,
+        _ => return None,
+    })
+}
 
-pub static KEYWORDS: [(&str, TokenType); 16] = [
-    ("and", TokenType::And),
-    ("class", TokenType::Class),
-    ("else", TokenType::Else),
-    ("false", TokenType::False),
-    ("fun", TokenType::Fun),
-    ("for", TokenType::For),
-    ("if", TokenType::If),
-    ("nil", TokenType::Nil),
-    ("or", TokenType::Or),
-    ("print", TokenType::Print),
-    ("return", TokenType::Return),
-    ("super", TokenType::Super),
-    ("this", TokenType::This),
-    ("true", TokenType::True),
-    ("var", TokenType::Var),
-    ("while", TokenType::While),
-];
+fn fixed_lexeme(t: TokenType) -> &'static str {
+    use TokenType::*;
+    match t {
+        LeftParen => "(", RightParen => ")",
+        LeftBrace => "{", RightBrace => "}",
+        Comma => ",", Dot => ".",
+        Minus => "-", Plus => "+", Semicolon => ";", Slash => "/", Star => "*",
+        Bang => "!", BangEqual => "!=",
+        Equal => "=", EqualEqual => "==",
+        Greater => ">", GreaterEqual => ">=",
+        Less => "<", LessEqual => "<=",
+        And => "and", Class => "class", Else => "else", False => "false",
+        Fun => "fun", For => "for", If => "if", Nil => "nil", Or => "or",
+        Print => "print", Return => "return", Super => "super", This => "this",
+        True => "true", Var => "var", While => "while",
+        EOF => "",
+        // Variable-text tokens — caller should use Token::lexeme() which returns the stored slice.
+        Identifier | String | Number => "",
+    }
+}
 
 #[derive(Clone)]
 pub enum Literal {
@@ -117,28 +141,31 @@ impl std::fmt::Debug for Literal {
 #[derive(Clone, Debug)]
 pub struct Token {
     pub token_type: TokenType,
-    pub lexeme: Option<Rc<str>>,
+    // Only populated for Identifier/String/Number; other token types derive lexeme from token_type.
+    pub lexeme: Option<Box<str>>,
     pub literal: Option<Literal>,
-    pub line: usize
+    pub line: usize,
 }
 
 impl Token {
     pub fn new(token_type: TokenType, lexeme: Option<&str>, literal: Option<Literal>, line: usize) -> Self {
         Token {
             token_type,
-            lexeme: lexeme.map(Rc::from),
+            lexeme: lexeme.map(Box::from),
             literal,
-            line
+            line,
         }
     }
 
     #[allow(dead_code)]
-    pub fn operator(token_type: TokenType, lexeme: Option<&str>, line: usize) -> Self {
-        Token {
-            token_type,
-            lexeme: lexeme.map(Rc::from),
-            literal: None,
-            line
+    pub fn operator(token_type: TokenType, line: usize) -> Self {
+        Token { token_type, lexeme: None, literal: None, line }
+    }
+
+    pub fn lexeme(&self) -> &str {
+        match &self.lexeme {
+            Some(s) => s,
+            None => fixed_lexeme(self.token_type),
         }
     }
 }

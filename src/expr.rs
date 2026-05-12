@@ -1,4 +1,4 @@
-use std::{fmt::Debug};
+use std::fmt::Debug;
 
 use crate::token;
 
@@ -6,7 +6,7 @@ pub struct BinaryExpr {
     pub left: Box<Expr>,
     pub operator: token::Token,
     pub right: Box<Expr>,
-} 
+}
 
 pub struct GroupingExpr {
     pub expression: Box<Expr>,
@@ -18,7 +18,7 @@ pub struct LiteralExpr {
 
 pub struct UnaryExpr {
     pub operator: token::Token,
-    pub right: Box<Expr>
+    pub right: Box<Expr>,
 }
 
 pub enum Expr {
@@ -32,7 +32,7 @@ impl Expr {
     pub fn binary(left: Expr, operator: token::Token, right: Expr) -> Self {
         Expr::BinaryExprs(BinaryExpr {
             left: Box::new(left),
-            operator: operator,
+            operator,
             right: Box::new(right),
         })
     }
@@ -44,14 +44,12 @@ impl Expr {
     }
 
     pub fn literal(value: token::Literal) -> Self {
-        Expr::LiteralExprs(LiteralExpr {
-            value: value,
-        })
+        Expr::LiteralExprs(LiteralExpr { value })
     }
 
     pub fn unary(operator: token::Token, right: Expr) -> Self {
         Expr::UnaryExprs(UnaryExpr {
-            operator: operator,
+            operator,
             right: Box::new(right),
         })
     }
@@ -60,15 +58,15 @@ impl Expr {
 impl Expr {
     pub fn pretty_print(&self) -> String {
         match self {
-            Expr::BinaryExprs(binary) => format!("(operator({}) {} {})", 
-                binary.operator.lexeme.as_ref().unwrap(),
+            Expr::BinaryExprs(binary) => format!("(operator({}) {} {})",
+                binary.operator.lexeme(),
                 binary.left.pretty_print(),
                 binary.right.pretty_print()
             ),
             Expr::GroupingExprs(grouping) => format!("(group {})", grouping.expression.pretty_print()),
             Expr::LiteralExprs(literal) => format!("{}({:?})", literal.value.get_type(), literal.value),
-            Expr::UnaryExprs(unary) => format!("(operator({}) {})", 
-                unary.operator.lexeme.as_ref().unwrap(),
+            Expr::UnaryExprs(unary) => format!("(operator({}) {})",
+                unary.operator.lexeme(),
                 unary.right.pretty_print()
             ),
         }
@@ -90,14 +88,14 @@ mod tests {
     fn test_expr_pretty_print() {
         let expr = Expr::binary(
             Expr::unary(
-                token::Token::operator(token::TokenType::Minus, Some("-"), 1),
+                token::Token::operator(token::TokenType::Minus, 1),
                 Expr::literal(token::Literal::Number(123.0)),
             ),
-            token::Token::operator(token::TokenType::Star, Some("*"), 1),
+            token::Token::operator(token::TokenType::Star, 1),
             Expr::grouping(
                 Expr::literal(token::Literal::Number(45.67)),
             ),
         );
-        assert_eq!(expr.pretty_print(), "(* (- 123) (group 45.67))");
+        assert_eq!(expr.pretty_print(), "(operator(*) (operator(-) number(123)) (group number(45.67)))");
     }
 }

@@ -14,9 +14,11 @@ mod interpreter;
 
 
 fn run_file(path: &str) {
-        let contents = fs::read_to_string(path)
-            .expect("Something went wrong loading the script");
-    run(&contents);
+    let contents = fs::read_to_string(path)
+        .expect("Something went wrong loading the script");
+    if let Err(e) = run(&contents) {
+        std::process::exit(e.exit_code());
+    }
 }
 
 fn run_prompt() {
@@ -32,36 +34,17 @@ fn run_prompt() {
         if line.trim() == "exit" {
             break;
         }
-        run(&line);
+        if let Err(e) = run(&line) {
+            info!("{:?}", e);
+        }
         line.clear();
     }
 }
 
-fn run(source: &str) {
-    let mut scanner = scanner::Scanner::new(source);
-    let tokens_result = scanner.scan_tokens();
-    let tokens = match tokens_result {
-        Ok(tokens) => tokens,
-        Err(e) => {
-            info!("Scanner error: {}", e);
-            return;
-        }
-    };
-    // for token in tokens {
-    //     println!("{:?}", token);
-    // }
-    let mut parser = parser::Parser::new(tokens);
-    let statements = parser.parse();
-    if statements.is_err() {
-        info!("Parser error: {}", statements.err().unwrap());
-        return;
-    }
-    let statements = statements.ok().unwrap();
-    let interpret_result = interpreter::interpret(statements);
-    if interpret_result.is_err() {
-        info!("Runtime error: {}", interpret_result.err().unwrap());
-        return;
-    }
+fn run(source: &str) -> Result<(), error::Error> {
+    let tokens = scanner::scan_tokens(source)?;
+    let statements = parser::Parser::new(tokens).parse()?;
+    interpreter::interpret(&statements)
 }
 
 fn main() {

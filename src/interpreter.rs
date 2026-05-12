@@ -1,121 +1,60 @@
 use crate::expr::Expr;
 use crate::stmt::Stmt;
 use crate::token::{Token, TokenType, Literal};
-use crate::error::{error_at_token};
+use crate::error::{error_at_token, Error};
 use std::result::Result;
 use std::rc::Rc;
 
-fn evaluate(expr: &Expr) -> Result<Literal, Rc<str>> {
+fn evaluate(expr: &Expr) -> Result<Literal, Error> {
     match expr {
         Expr::LiteralExprs(literal_expr) => Ok(literal_expr.value.clone()),
         Expr::GroupingExprs(grouping_expr) => evaluate(&grouping_expr.expression),
         Expr::UnaryExprs(unary_expr) => {
             let right = evaluate(&unary_expr.right)?;
             match unary_expr.operator.token_type {
-                TokenType::Minus => {
-                    if let Literal::Number(n) = right {
-                        Ok(Literal::Number(-n))
-                    } else {
-                        let error_message = format!("Operand must be a number, found: {}({:?})", right.get_type(), right);
-                        Err(error_from_string(&unary_expr.operator, error_message))
-                    }
+                TokenType::Minus => match right {
+                    Literal::Number(n) => Ok(Literal::Number(-n)),
+                    _ => Err(type_mismatch_unary(&unary_expr.operator, "a number", &right)),
                 },
                 TokenType::Bang => Ok(Literal::Boolean(!is_truthy(&right))),
-                _ => Err(error_from_string(&unary_expr.operator, format!("Invalid unary operator: {}", unary_expr.operator.lexeme.as_ref().unwrap()))),
+                _ => Err(error(&unary_expr.operator, &format!("Invalid unary operator: {}", unary_expr.operator.lexeme()))),
             }
         },
         Expr::BinaryExprs(binary_expr) => {
             let left = evaluate(&binary_expr.left)?;
             let right = evaluate(&binary_expr.right)?;
-            match binary_expr.operator.token_type {
-                TokenType::Plus => {
-                    match (&left, &right) {
-                        (Literal::Number(l), Literal::Number(r)) => Ok(Literal::Number(l + r)),
-                        (Literal::String(l), Literal::String(r)) => Ok(Literal::String(Rc::from(format!("{}{}", l, r)))),
-                        _ => Err(error_from_string(&binary_expr.operator, format!("Operands must be two numbers or two strings, found: {}({:?}) and {}({:?})", left.get_type(), left, right.get_type(), right))),
-                    }
+            let op = &binary_expr.operator;
+            match op.token_type {
+                TokenType::Plus => match (&left, &right) {
+                    (Literal::Number(l), Literal::Number(r)) => Ok(Literal::Number(l + r)),
+                    (Literal::String(l), Literal::String(r)) => Ok(Literal::String(Rc::from(format!("{}{}", l, r)))),
+                    _ => Err(type_mismatch(op, "two numbers or two strings", &left, &right)),
                 },
-                TokenType::Minus => {
-                    if let (Literal::Number(l), Literal::Number(r)) = (&left, &right) {
-                        Ok(Literal::Number(l - r))
-                    } else {
-                        Err(error_from_string(&binary_expr.operator, format!("Operands must be numbers, found: {}({:?}) and {}({:?})", left.get_type(), left, right.get_type(), right)))
-                    }
-                },
-                TokenType::Star => {
-                    if let (Literal::Number(l), Literal::Number(r)) = (&left, &right) {
-                        Ok(Literal::Number(l * r))
-                    } else {
-                        Err(error_from_string(&binary_expr.operator, format!("Operands must be numbers, found: {}({:?}) and {}({:?})", left.get_type(), left, right.get_type(), right)))
-                    }
-                },
-                TokenType::Slash => {
-                    if let (Literal::Number(l), Literal::Number(r)) = (&left, &right) {
-                        if *r == 0.0 {
-                            Err(error(&binary_expr.operator, "Division by zero."))
-                        } else {
-                            Ok(Literal::Number(l / r))
-                        }
-                    } else {
-                        Err(error_from_string(&binary_expr.operator, format!("Operands must be numbers, found: {}({:?}) and {}({:?})", left.get_type(), left, right.get_type(), right)))
-                    }
-                },
-                TokenType::EqualEqual => {
-                    if left.get_type() == right.get_type() {
-                        Ok(Literal::Boolean(left == right))
-                    } else {
-                        Err(error_from_string(&binary_expr.operator, format!("Operands must be of the same type for equality comparison, found: {}({:?}) and {}({:?})", left.get_type(), left, right.get_type(), right)))
-                    }
-                },
-                TokenType::BangEqual => {
-                    if left.get_type() == right.get_type() {
-                        Ok(Literal::Boolean(left != right))
-                    } else {
-                        Err(error_from_string(&binary_expr.operator, format!("Operands must be of the same type for inequality comparison, found: {}({:?}) and {}({:?})", left.get_type(), left, right.get_type(), right)))
-                    }
-                },
-                TokenType::Greater => {
-                    if let (Literal::Number(l), Literal::Number(r)) = (&left, &right) {
-                        Ok(Literal::Boolean(l > r))
-                    } else {
-                        Err(error_from_string(&binary_expr.operator, format!("Operands must be numbers for '>' comparison, found: {}({:?}) and {}({:?})", left.get_type(), left, right.get_type(), right)))
-                    }
-                },
-                TokenType::GreaterEqual => {
-                    if let (Literal::Number(l), Literal::Number(r)) = (&left, &right) {
-                        Ok(Literal::Boolean(l >= r))
-                    } else {
-                        Err(error_from_string(&binary_expr.operator, format!("Operands must be numbers for '>=' comparison, found: {}({:?}) and {}({:?})", left.get_type(), left, right.get_type(), right)))
-                    }
-                },
-                TokenType::Less => {
-                    if let (Literal::Number(l), Literal::Number(r)) = (&left, &right) {
-                        Ok(Literal::Boolean(l < r))
-                    } else {
-                        Err(error_from_string(&binary_expr.operator, format!("Operands must be numbers for '<' comparison, found: {}({:?}) and {}({:?})", left.get_type(), left, right.get_type(), right)))
-                    }
-                },
-                TokenType::LessEqual => {
-                    if let (Literal::Number(l), Literal::Number(r)) = (&left, &right) {
-                        Ok(Literal::Boolean(l <= r))
-                    } else {
-                        Err(error_from_string(&binary_expr.operator, format!("Operands must be numbers for '<=' comparison, found: {}({:?}) and {}({:?})", left.get_type(), left, right.get_type(), right)))
-                    }
-                },
-                _ => Err(error_from_string(&binary_expr.operator, format!("Invalid binary operator: {}", binary_expr.operator.lexeme.as_ref().unwrap()))),
+                TokenType::Minus => numeric_binop(op, &left, &right, |l, r| Ok(l - r)),
+                TokenType::Star  => numeric_binop(op, &left, &right, |l, r| Ok(l * r)),
+                TokenType::Slash => numeric_binop(op, &left, &right, |l, r| {
+                    if r == 0.0 { Err("Division by zero.") } else { Ok(l / r) }
+                }),
+                TokenType::Greater      => numeric_compare(op, &left, &right, |l, r| l >  r),
+                TokenType::GreaterEqual => numeric_compare(op, &left, &right, |l, r| l >= r),
+                TokenType::Less         => numeric_compare(op, &left, &right, |l, r| l <  r),
+                TokenType::LessEqual    => numeric_compare(op, &left, &right, |l, r| l <= r),
+                TokenType::EqualEqual => Ok(Literal::Boolean(left == right)),
+                TokenType::BangEqual  => Ok(Literal::Boolean(left != right)),
+                _ => Err(error(op, &format!("Invalid binary operator: {}", op.lexeme()))),
             }
         },
     }
 }
 
-pub fn interpret(stmt: Rc<[Stmt]>) -> Result<(), Rc<str>> {
-    for statement in stmt.iter() {
+pub fn interpret(stmts: &[Stmt]) -> Result<(), Error> {
+    for statement in stmts {
         execute(statement)?;
     }
     Ok(())
 }
 
-fn execute(stmt: &Stmt) -> Result<(), Rc<str>> {
+fn execute(stmt: &Stmt) -> Result<(), Error> {
     match stmt {
         Stmt::Expression(expr_stmt) => {
             evaluate(&expr_stmt.expression)?;
@@ -137,12 +76,43 @@ fn is_truthy(literal: &Literal) -> bool {
     }
 }
 
-fn error<'a> (token: &Token, message: &'a str) -> Rc<str> {
-    error_at_token(token, "Runtime", message);
-    Rc::from(message)
+fn numeric_binop<F>(op: &Token, left: &Literal, right: &Literal, f: F) -> Result<Literal, Error>
+where
+    F: FnOnce(f64, f64) -> Result<f64, &'static str>,
+{
+    match (left, right) {
+        (Literal::Number(l), Literal::Number(r)) => f(*l, *r)
+            .map(Literal::Number)
+            .map_err(|msg| error(op, msg)),
+        _ => Err(type_mismatch(op, "numbers", left, right)),
+    }
 }
 
-fn error_from_string(token: &Token, message: String) -> Rc<str> {
-    error_at_token(token, "Runtime", message.as_str());
-    Rc::from(message)
+fn numeric_compare<F>(op: &Token, left: &Literal, right: &Literal, f: F) -> Result<Literal, Error>
+where
+    F: FnOnce(f64, f64) -> bool,
+{
+    match (left, right) {
+        (Literal::Number(l), Literal::Number(r)) => Ok(Literal::Boolean(f(*l, *r))),
+        _ => Err(type_mismatch(op, "numbers", left, right)),
+    }
+}
+
+fn type_mismatch(op: &Token, expected: &str, left: &Literal, right: &Literal) -> Error {
+    error(op, &format!(
+        "Operands must be {}, found: {}({:?}) and {}({:?})",
+        expected, left.get_type(), left, right.get_type(), right,
+    ))
+}
+
+fn type_mismatch_unary(op: &Token, expected: &str, value: &Literal) -> Error {
+    error(op, &format!(
+        "Operand must be {}, found: {}({:?})",
+        expected, value.get_type(), value,
+    ))
+}
+
+fn error(token: &Token, message: &str) -> Error {
+    error_at_token(token, "Runtime", message);
+    Error::Runtime
 }
