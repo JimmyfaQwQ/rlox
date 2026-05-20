@@ -1,4 +1,4 @@
-use crate::enviorment::Enviorment;
+use crate::environment::Environment;
 use crate::expr::Expr;
 use crate::function::Function;
 use crate::stmt::Stmt;
@@ -10,7 +10,7 @@ use std::result::Result;
 use std::rc::Rc;
 
 pub struct Interpreter {
-    pub enviorment: Rc<RefCell<Enviorment>>,
+    pub environment: Rc<RefCell<Environment>>,
 }
 
 impl Interpreter {
@@ -68,7 +68,7 @@ impl Interpreter {
             },
             Expr::VariableExprs(variable_expr) => {
                 let name = variable_expr.name.lexeme();
-                match self.enviorment.borrow().get(name) {
+                match self.environment.borrow().get(name) {
                     Ok(value) => Ok(value),
                     Err(msg) => Err(error(&variable_expr.name, &msg)),
                 }
@@ -76,7 +76,7 @@ impl Interpreter {
             Expr::AssignExprs(assign_expr) => {
                 let value = self.evaluate(&assign_expr.value)?;
                 let name = assign_expr.name.lexeme();
-                match self.enviorment.borrow_mut().assign(name, value.clone()) {
+                match self.environment.borrow_mut().assign(name, value.clone()) {
                     Ok(()) => Ok(value),
                     Err(msg) => Err(error(&assign_expr.name, &msg)),
                 }
@@ -128,11 +128,11 @@ impl Interpreter {
                 } else {
                     Object::Nil
                 };
-                self.enviorment.borrow_mut().define(var_stmt.name.lexeme(), value);
+                self.environment.borrow_mut().define(var_stmt.name.lexeme(), value);
                 Ok(())
             },
             Stmt::Block(block_stmt) => {
-                let new_env = Enviorment::new(Some(Rc::clone(&self.enviorment)));
+                let new_env = Environment::new(Some(Rc::clone(&self.environment)));
                 self.execute_block(&block_stmt.statements, new_env)
             },
             Stmt::If(if_stmt) => {
@@ -153,10 +153,10 @@ impl Interpreter {
             },
             Stmt::Function(function_stmt) => {
                 let function = Function {
-                    decleration: Rc::clone(function_stmt),
-                    closure: Rc::clone(&self.enviorment),
+                    declaration: Rc::clone(function_stmt),
+                    closure: Rc::clone(&self.environment),
                 };
-                self.enviorment.borrow_mut().define(function_stmt.name.lexeme(), Object::Callable(Rc::new(function)));
+                self.environment.borrow_mut().define(function_stmt.name.lexeme(), Object::Callable(Rc::new(function)));
                 Ok(())
             },
             Stmt::Return(return_stmt) => {
@@ -170,8 +170,8 @@ impl Interpreter {
         }
     }
 
-    pub fn execute_block(&mut self, statements: &[Stmt], env: Rc<RefCell<Enviorment>>) -> Result<(), Error> {
-        let previous = std::mem::replace(&mut self.enviorment, env);
+    pub fn execute_block(&mut self, statements: &[Stmt], env: Rc<RefCell<Environment>>) -> Result<(), Error> {
+        let previous = std::mem::replace(&mut self.environment, env);
         let mut result = Ok(());
         for statement in statements {
             result = self.execute(statement);
@@ -179,7 +179,7 @@ impl Interpreter {
                 break;
             }
         }
-        self.enviorment = previous;
+        self.environment = previous;
         result
     }
 }

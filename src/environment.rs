@@ -5,8 +5,8 @@ use crate::interpreter;
 use crate::object::Object;
 use crate::callable::Callable;
 
-pub struct Enviorment {
-    enclosing: Option<Rc<RefCell<Enviorment>>>,
+pub struct Environment {
+    enclosing: Option<Rc<RefCell<Environment>>>,
     values: HashMap<Box<str>, Object>,
 }
 
@@ -22,9 +22,9 @@ impl Callable for ClockFn {
     }
 }
 
-impl Enviorment {
-    pub fn new(enclosing: Option<Rc<RefCell<Enviorment>>>) -> Rc<RefCell<Self>> {
-        let mut env = Enviorment {
+impl Environment {
+    pub fn new(enclosing: Option<Rc<RefCell<Environment>>>) -> Rc<RefCell<Self>> {
+        let mut env = Environment {
             enclosing,
             values: HashMap::new(),
         };

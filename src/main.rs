@@ -13,14 +13,14 @@ mod expr;
 mod stmt;
 mod parser;
 mod interpreter;
-mod enviorment;
+mod environment;
 mod callable;
 mod object;
 mod function;
 
 
 fn run_file(path: &str) {
-    let env = enviorment::Enviorment::new(None);
+    let env = environment::Environment::new(None);
     let contents = fs::read_to_string(path)
         .expect("Something went wrong loading the script");
     if let Err(e) = run(&contents, env) {
@@ -30,7 +30,7 @@ fn run_file(path: &str) {
 
 fn run_prompt() {
     let mut line = String::new();
-    let env = enviorment::Enviorment::new(None);
+    let env = environment::Environment::new(None);
     loop {
         print!("> ");
         io::stdout().flush().expect("Failed to flush stdout.");
@@ -49,10 +49,10 @@ fn run_prompt() {
     }
 }
 
-fn run(source: &str, env: Rc<RefCell<enviorment::Enviorment>>) -> Result<(), error::Error> {
+fn run(source: &str, env: Rc<RefCell<environment::Environment>>) -> Result<(), error::Error> {
     let tokens = scanner::scan_tokens(source)?;
     let statements = parser::Parser::new(tokens).parse()?;
-    let mut interpreter = interpreter::Interpreter { enviorment: env };
+    let mut interpreter = interpreter::Interpreter { environment: env };
     interpreter.interpret(&statements)
 }
 
