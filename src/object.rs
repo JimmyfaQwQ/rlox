@@ -53,6 +53,7 @@ impl PartialEq for Object {
             (Object::Number(n1), Object::Number(n2)) => n1 == n2,
             (Object::Boolean(b1), Object::Boolean(b2)) => b1 == b2,
             (Object::Nil, Object::Nil) => true,
+            (Object::Callable(a), Object::Callable(b)) => Rc::ptr_eq(a, b),
             _ => false,
         }
     }

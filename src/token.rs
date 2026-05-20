@@ -1,3 +1,4 @@
+use std::rc::Rc;
 use crate::object::Object;
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -70,7 +71,7 @@ fn fixed_lexeme(t: TokenType) -> &'static str {
 pub struct Token {
     pub token_type: TokenType,
     // Only populated for Identifier/String/Number; other token types derive lexeme from token_type.
-    pub lexeme: Option<Box<str>>,
+    pub lexeme: Option<Rc<str>>,
     pub literal: Option<Object>,
     pub line: usize,
 }
@@ -79,7 +80,7 @@ impl Token {
     pub fn new(token_type: TokenType, lexeme: Option<&str>, literal: Option<Object>, line: usize) -> Self {
         Token {
             token_type,
-            lexeme: lexeme.map(Box::from),
+            lexeme: lexeme.map(Rc::from),
             literal,
             line,
         }

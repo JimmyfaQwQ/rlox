@@ -259,6 +259,9 @@ impl Parser {
         if self.match_token(&[TokenType::For]) {
             return self.for_statement();
         }
+        if self.match_token(&[TokenType::Return]) {
+            return self.return_statement();
+        }
         self.expression_statement()
     }
 
@@ -269,6 +272,17 @@ impl Parser {
         }
         self.consume(TokenType::RightBrace, "Expected '}' after block.")?;
         Ok(statements)
+    }
+
+    fn return_statement(&mut self) -> Result<Stmt, Error> {
+        let keyword = self.take_previous();
+        let value = if !self.check(TokenType::Semicolon) {
+            Some(self.expression()?)
+        } else {
+            None
+        };
+        self.consume(TokenType::Semicolon, "Expected ';' after return value.")?;
+        Ok(Stmt::return_stmt(keyword, value))
     }
 
     fn print_statement(&mut self) -> Result<Stmt, Error> {
@@ -354,10 +368,35 @@ impl Parser {
 
 impl Parser {
     fn declaration(&mut self) -> Result<Stmt, Error> {
+        if self.match_token(&[TokenType::Fun]) {
+            return self.function("function");
+        }
         if self.match_token(&[TokenType::Var]) {
             return self.var_declaration();
         }
         self.statement()
+    }
+
+    fn function(&mut self, kind: &str) -> Result<Stmt, Error> {
+        let name = self.digest(TokenType::Identifier, &format!("Expected {} name.", kind))?;
+        self.consume(TokenType::LeftParen, &format!("Expected '(' after {} name.", kind))?;
+        let mut parameters: Vec<Token> = Vec::new();
+        if !self.check(TokenType::RightParen) {
+            loop {
+                if parameters.len() >= 255 {
+                    self.error_at_peek("Can't have more than 255 parameters.");
+                    return Err(Error::Parser);
+                }
+                parameters.push(self.digest(TokenType::Identifier, "Expected parameter name.")?);
+                if !self.match_token(&[TokenType::Comma]) {
+                    break;
+                }
+            }
+        }
+        self.consume(TokenType::RightParen, "Expected ')' after parameters.")?;
+        self.consume(TokenType::LeftBrace, &format!("Expected '{{' before {} body.", kind))?;
+        let body = self.block()?;
+        Ok(Stmt::function_stmt(name, parameters, body))
     }
 
     fn var_declaration(&mut self) -> Result<Stmt, Error> {

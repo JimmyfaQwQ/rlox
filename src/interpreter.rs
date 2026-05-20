@@ -1,160 +1,186 @@
 use crate::enviorment::Enviorment;
 use crate::expr::Expr;
+use crate::function::Function;
 use crate::stmt::Stmt;
 use crate::token::{Token, TokenType};
 use crate::object::Object;
 use crate::error::{error_at_token, Error};
+use std::cell::RefCell;
 use std::result::Result;
 use std::rc::Rc;
 
-fn evaluate(expr: &Expr, env: &mut Enviorment) -> Result<Object, Error> {
-    match expr {
-        Expr::LiteralExprs(literal_expr) => Ok(literal_expr.value.clone()),
-        Expr::GroupingExprs(grouping_expr) => evaluate(&grouping_expr.expression, env),
-        Expr::UnaryExprs(unary_expr) => {
-            let right = evaluate(&unary_expr.right, env)?;
-            match unary_expr.operator.token_type {
-                TokenType::Minus => match right {
-                    Object::Number(n) => Ok(Object::Number(-n)),
-                    _ => Err(type_mismatch_unary(&unary_expr.operator, "a number", &right)),
-                },
-                TokenType::Bang => Ok(Object::Boolean(!is_truthy(&right))),
-                _ => Err(error(&unary_expr.operator, &format!("Invalid unary operator: {}", unary_expr.operator.lexeme()))),
-            }
-        },
-        Expr::BinaryExprs(binary_expr) => {
-            let left = evaluate(&binary_expr.left, env)?;
-            let right = evaluate(&binary_expr.right, env)?;
-            let op = &binary_expr.operator;
-            match op.token_type {
-                TokenType::Plus => match (&left, &right) {
-                    (Object::Number(l), Object::Number(r)) => Ok(Object::Number(l + r)),
-                    (Object::String(l), Object::String(r)) => Ok(Object::String(Rc::from(format!("{}{}", l, r)))),
-                    _ => Err(type_mismatch(op, "two numbers or two strings", &left, &right)),
-                },
-                TokenType::Minus => numeric_binop(op, &left, &right, |l, r| Ok(l - r)),
-                TokenType::Star  => numeric_binop(op, &left, &right, |l, r| Ok(l * r)),
-                TokenType::Slash => numeric_binop(op, &left, &right, |l, r| {
-                    if r == 0.0 { Err("Division by zero.") } else { Ok(l / r) }
-                }),
-                TokenType::Greater      => numeric_compare(op, &left, &right, |l, r| l >  r),
-                TokenType::GreaterEqual => numeric_compare(op, &left, &right, |l, r| l >= r),
-                TokenType::Less         => numeric_compare(op, &left, &right, |l, r| l <  r),
-                TokenType::LessEqual    => numeric_compare(op, &left, &right, |l, r| l <= r),
-                TokenType::EqualEqual => Ok(Object::Boolean(left == right)),
-                TokenType::BangEqual  => Ok(Object::Boolean(left != right)),
-                _ => Err(error(op, &format!("Invalid binary operator: {}", op.lexeme()))),
-            }
-        },
-        Expr::LogicalExprs(logical_expr) => {
-            let left = evaluate(&logical_expr.left, env)?;
-            if logical_expr.operator.token_type == TokenType::Or {
-                if is_truthy(&left) {
-                    return Ok(left);
+pub struct Interpreter {
+    pub enviorment: Rc<RefCell<Enviorment>>,
+}
+
+impl Interpreter {
+    pub fn evaluate(&mut self, expr: &Expr) -> Result<Object, Error> {
+        match expr {
+            Expr::LiteralExprs(literal_expr) => Ok(literal_expr.value.clone()),
+            Expr::GroupingExprs(grouping_expr) => self.evaluate(&grouping_expr.expression),
+            Expr::UnaryExprs(unary_expr) => {
+                let right = self.evaluate(&unary_expr.right)?;
+                match unary_expr.operator.token_type {
+                    TokenType::Minus => match right {
+                        Object::Number(n) => Ok(Object::Number(-n)),
+                        _ => Err(type_mismatch_unary(&unary_expr.operator, "a number", &right)),
+                    },
+                    TokenType::Bang => Ok(Object::Boolean(!is_truthy(&right))),
+                    _ => Err(error(&unary_expr.operator, &format!("Invalid unary operator: {}", unary_expr.operator.lexeme()))),
                 }
-            } else {
-                if !is_truthy(&left) {
-                    return Ok(left);
+            },
+            Expr::BinaryExprs(binary_expr) => {
+                let left = self.evaluate(&binary_expr.left)?;
+                let right = self.evaluate(&binary_expr.right)?;
+                let op = &binary_expr.operator;
+                match op.token_type {
+                    TokenType::Plus => match (&left, &right) {
+                        (Object::Number(l), Object::Number(r)) => Ok(Object::Number(l + r)),
+                        (Object::String(l), Object::String(r)) => Ok(Object::String(Rc::from(format!("{}{}", l, r)))),
+                        _ => Err(type_mismatch(op, "two numbers or two strings", &left, &right)),
+                    },
+                    TokenType::Minus => numeric_binop(op, &left, &right, |l, r| Ok(l - r)),
+                    TokenType::Star  => numeric_binop(op, &left, &right, |l, r| Ok(l * r)),
+                    TokenType::Slash => numeric_binop(op, &left, &right, |l, r| {
+                        if r == 0.0 { Err("Division by zero.") } else { Ok(l / r) }
+                    }),
+                    TokenType::Greater      => numeric_compare(op, &left, &right, |l, r| l >  r),
+                    TokenType::GreaterEqual => numeric_compare(op, &left, &right, |l, r| l >= r),
+                    TokenType::Less         => numeric_compare(op, &left, &right, |l, r| l <  r),
+                    TokenType::LessEqual    => numeric_compare(op, &left, &right, |l, r| l <= r),
+                    TokenType::EqualEqual => Ok(Object::Boolean(left == right)),
+                    TokenType::BangEqual  => Ok(Object::Boolean(left != right)),
+                    _ => Err(error(op, &format!("Invalid binary operator: {}", op.lexeme()))),
                 }
-            }
-            evaluate(&logical_expr.right, env)
-        },
-        Expr::VariableExprs(variable_expr) => {
-            let name = variable_expr.name.lexeme();
-            match env.get(name) {
-                Ok(value) => Ok(value.clone()),
-                Err(msg) => Err(error(&variable_expr.name, &msg)),
-            }
-        },
-        Expr::AssignExprs(assign_expr) => {
-            let value = evaluate(&assign_expr.value, env)?;
-            let name = assign_expr.name.lexeme();
-            match env.assign(name, value.clone()) {
-                Ok(()) => Ok(value),
-                Err(msg) => Err(error(&assign_expr.name, &msg)),
-            }
-        },
-        Expr::CallExprs(call_expr) => {
-            let callee = evaluate(&call_expr.callee, env)?;
-            let mut arguments = Vec::new();
-            for arg in &call_expr.arguments {
-                arguments.push(evaluate(arg, env)?);
-            }
-            match callee {
-                Object::Callable(function) => {
-                    if arguments.len() != function.arity() {
-                        return Err(error(&call_expr.paren, &format!(
-                            "Expected {} arguments but got {}.",
-                            function.arity(),
-                            arguments.len()
-                        )));
+            },
+            Expr::LogicalExprs(logical_expr) => {
+                let left = self.evaluate(&logical_expr.left)?;
+                if logical_expr.operator.token_type == TokenType::Or {
+                    if is_truthy(&left) {
+                        return Ok(left);
                     }
-                    function.call(arguments).map_err(|msg| error(&call_expr.paren, &msg))
-                },
-                _ => Err(error(&call_expr.paren, "Can only call functions and classes.")),
-            }
-        },
+                } else {
+                    if !is_truthy(&left) {
+                        return Ok(left);
+                    }
+                }
+                self.evaluate(&logical_expr.right)
+            },
+            Expr::VariableExprs(variable_expr) => {
+                let name = variable_expr.name.lexeme();
+                match self.enviorment.borrow().get(name) {
+                    Ok(value) => Ok(value),
+                    Err(msg) => Err(error(&variable_expr.name, &msg)),
+                }
+            },
+            Expr::AssignExprs(assign_expr) => {
+                let value = self.evaluate(&assign_expr.value)?;
+                let name = assign_expr.name.lexeme();
+                match self.enviorment.borrow_mut().assign(name, value.clone()) {
+                    Ok(()) => Ok(value),
+                    Err(msg) => Err(error(&assign_expr.name, &msg)),
+                }
+            },
+            Expr::CallExprs(call_expr) => {
+                let callee = self.evaluate(&call_expr.callee)?;
+                let mut arguments = Vec::new();
+                for arg in &call_expr.arguments {
+                    arguments.push(self.evaluate(arg)?);
+                }
+                match callee {
+                    Object::Callable(function) => {
+                        if arguments.len() != function.arity() {
+                            return Err(error(&call_expr.paren, &format!(
+                                "Expected {} arguments but got {}.",
+                                function.arity(),
+                                arguments.len()
+                            )));
+                        }
+                        function.call(self, arguments).map_err(|msg| error(&call_expr.paren, &msg))
+                    },
+                    _ => Err(error(&call_expr.paren, "Can only call functions and classes.")),
+                }
+            },
+        }
     }
-}
 
-pub fn interpret(stmts: &[Stmt], env: &mut Enviorment) -> Result<(), Error> {
-    for statement in stmts {
-        execute(statement, env)?;
+    pub fn interpret(&mut self, stmts: &[Stmt]) -> Result<(), Error> {
+        for statement in stmts {
+            self.execute(statement)?;
+        }
+        Ok(())
     }
-    Ok(())
-}
 
-fn execute(stmt: &Stmt, env: &mut Enviorment) -> Result<(), Error> {
-    match stmt {
-        Stmt::Expression(expr_stmt) => {
-            evaluate(&expr_stmt.expression, env)?;
-            Ok(())
-        },
-        Stmt::Print(print_stmt) => {
-            let value = evaluate(&print_stmt.expression, env)?;
-            println!("{:?}", value);
-            Ok(())
-        },
-        Stmt::Var(var_stmt) => {
-            let value = if let Some(initializer) = &var_stmt.initializer {
-                evaluate(initializer, env)?
-            } else {
-                Object::Nil
-            };
-            env.define(var_stmt.name.lexeme(), value);
-            Ok(())
-        },
-        Stmt::Block(block_stmt) => {
-            let parent = std::mem::take(env);
-            let mut block_env = Enviorment::new(Some(Box::new(parent)));
-            for statement in &block_stmt.statements {
-                execute(statement, &mut block_env)?;
-            }
-            *env = match block_env.take_enclosing() {
-                Some(enclosing) => *enclosing,
-                None => {
-                    eprintln!("Interpreter PANICING! No enclosing environment found after block execution.");
-                    return Err(Error::Runtime)
-                },
-            };
-            Ok(())
-        },
-        Stmt::If(if_stmt) => {
-            let condition = evaluate(&if_stmt.condition, env)?;
-            if is_truthy(&condition) {
-                execute(&if_stmt.then_branch, env)
-            } else if let Some(else_branch) = &if_stmt.else_branch {
-                execute(else_branch, env)
-            } else {
+    pub fn execute(&mut self, stmt: &Stmt) -> Result<(), Error> {
+        match stmt {
+            Stmt::Expression(expr_stmt) => {
+                self.evaluate(&expr_stmt.expression)?;
                 Ok(())
+            },
+            Stmt::Print(print_stmt) => {
+                let value = self.evaluate(&print_stmt.expression)?;
+                println!("{:?}", value);
+                Ok(())
+            },
+            Stmt::Var(var_stmt) => {
+                let value = if let Some(initializer) = &var_stmt.initializer {
+                    self.evaluate(initializer)?
+                } else {
+                    Object::Nil
+                };
+                self.enviorment.borrow_mut().define(var_stmt.name.lexeme(), value);
+                Ok(())
+            },
+            Stmt::Block(block_stmt) => {
+                let new_env = Enviorment::new(Some(Rc::clone(&self.enviorment)));
+                self.execute_block(&block_stmt.statements, new_env)
+            },
+            Stmt::If(if_stmt) => {
+                let condition = self.evaluate(&if_stmt.condition)?;
+                if is_truthy(&condition) {
+                    self.execute(&if_stmt.then_branch)
+                } else if let Some(else_branch) = &if_stmt.else_branch {
+                    self.execute(else_branch)
+                } else {
+                    Ok(())
+                }
+            },
+            Stmt::While(while_stmt) => {
+                while is_truthy(&self.evaluate(&while_stmt.condition)?) {
+                    self.execute(&while_stmt.body)?;
+                } 
+                Ok(())
+            },
+            Stmt::Function(function_stmt) => {
+                let function = Function {
+                    decleration: Rc::clone(function_stmt),
+                    closure: Rc::clone(&self.enviorment),
+                };
+                self.enviorment.borrow_mut().define(function_stmt.name.lexeme(), Object::Callable(Rc::new(function)));
+                Ok(())
+            },
+            Stmt::Return(return_stmt) => {
+                let value = if let Some(expr) = &return_stmt.value {
+                    Some(self.evaluate(expr)?)
+                } else {
+                    None
+                };
+                return Err(Error::Return(value));
+            },
+        }
+    }
+
+    pub fn execute_block(&mut self, statements: &[Stmt], env: Rc<RefCell<Enviorment>>) -> Result<(), Error> {
+        let previous = std::mem::replace(&mut self.enviorment, env);
+        let mut result = Ok(());
+        for statement in statements {
+            result = self.execute(statement);
+            if result.is_err() {
+                break;
             }
-        },
-        Stmt::While(while_stmt) => {
-            while is_truthy(&evaluate(&while_stmt.condition, env)?) {
-                execute(&while_stmt.body, env)?;
-            } 
-            Ok(())
-        },
+        }
+        self.enviorment = previous;
+        result
     }
 }
 

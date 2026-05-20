@@ -1,8 +1,11 @@
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+use crate::object::Object;
+
+#[derive(Debug, Clone, PartialEq)]
 pub enum Error {
     Scanner,
     Parser,
     Runtime,
+    Return(Option<Object>),
 }
 
 impl Error {
@@ -11,6 +14,7 @@ impl Error {
         match self {
             Error::Scanner | Error::Parser => 65,
             Error::Runtime => 70,
+            Error::Return(_) => 0, // Not an actual error, just a control flow mechanism
         }
     }
 }

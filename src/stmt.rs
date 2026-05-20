@@ -1,3 +1,4 @@
+use std::rc::Rc;
 use crate::expr::Expr;
 use crate::token::Token;
 
@@ -12,6 +13,17 @@ pub struct PrintStatement {
 pub struct VarStatement {
     pub name: Token,
     pub initializer: Option<Expr>,
+}
+
+pub struct FunctionStatement {
+    pub name: Token,
+    pub params: Vec<Token>,
+    pub body: Vec<Stmt>,
+}
+
+pub struct ReturnStatement {
+    pub keyword: Token,
+    pub value: Option<Expr>,
 }
 
 pub struct BlockStatement {
@@ -36,6 +48,8 @@ pub enum Stmt {
     Block(BlockStatement),
     If(IfStatement),
     While(WhileStatement),
+    Function(Rc<FunctionStatement>),
+    Return(ReturnStatement),
 }
 
 impl Stmt {
@@ -45,6 +59,10 @@ impl Stmt {
 
     pub fn print_stmt(expression: Expr) -> Self {
         Stmt::Print(PrintStatement { expression })
+    }
+
+    pub fn return_stmt(keyword: Token, value: Option<Expr>) -> Self {
+        Stmt::Return(ReturnStatement { keyword, value })
     }
 
     pub fn block_stmt(statements: Vec<Stmt>) -> Self {
@@ -68,5 +86,9 @@ impl Stmt {
             condition,
             body: Box::new(body),
         })
+    }
+
+    pub fn function_stmt(name: Token, params: Vec<Token>, body: Vec<Stmt>) -> Self {
+        Stmt::Function(Rc::new(FunctionStatement { name, params, body }))
     }
 }

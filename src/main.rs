@@ -1,6 +1,8 @@
 use std::io;
 use std::fs;
 use std::io::Write;
+use std::cell::RefCell;
+use std::rc::Rc;
 
 use layla_log::*;
 
@@ -14,20 +16,21 @@ mod interpreter;
 mod enviorment;
 mod callable;
 mod object;
+mod function;
 
 
 fn run_file(path: &str) {
-    let mut env = enviorment::Enviorment::new(None);
+    let env = enviorment::Enviorment::new(None);
     let contents = fs::read_to_string(path)
         .expect("Something went wrong loading the script");
-    if let Err(e) = run(&contents, &mut env) {
+    if let Err(e) = run(&contents, env) {
         std::process::exit(e.exit_code());
     }
 }
 
 fn run_prompt() {
     let mut line = String::new();
-    let mut env = enviorment::Enviorment::new(None);
+    let env = enviorment::Enviorment::new(None);
     loop {
         print!("> ");
         io::stdout().flush().expect("Failed to flush stdout.");
@@ -39,17 +42,18 @@ fn run_prompt() {
         if line.trim() == "exit" {
             break;
         }
-        if let Err(e) = run(&line, &mut env) {
-            info!("{:?}", e);
+        if let Err(e) = run(&line, Rc::clone(&env)) {
+            println!("Error: {:?}", e);
         }
         line.clear();
     }
 }
 
-fn run(source: &str, env: &mut enviorment::Enviorment) -> Result<(), error::Error> {
+fn run(source: &str, env: Rc<RefCell<enviorment::Enviorment>>) -> Result<(), error::Error> {
     let tokens = scanner::scan_tokens(source)?;
     let statements = parser::Parser::new(tokens).parse()?;
-    interpreter::interpret(&statements, env)
+    let mut interpreter = interpreter::Interpreter { enviorment: env };
+    interpreter.interpret(&statements)
 }
 
 fn main() {

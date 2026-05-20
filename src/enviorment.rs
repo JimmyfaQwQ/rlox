@@ -1,10 +1,12 @@
+use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
+use crate::interpreter;
 use crate::object::Object;
 use crate::callable::Callable;
 
 pub struct Enviorment {
-    enclosing: Option<Box<Enviorment>>,
+    enclosing: Option<Rc<RefCell<Enviorment>>>,
     values: HashMap<Box<str>, Object>,
 }
 
@@ -15,59 +17,45 @@ impl Callable for ClockFn {
         0
     }
 
-    fn call(&self, _arguments: Vec<Object>) -> Result<Object, String> {
+    fn call(&self, _interpreter: &mut interpreter::Interpreter, _arguments: Vec<Object>) -> Result<Object, String> {
         Ok(Object::Number(std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_secs_f64()))
     }
 }
 
-fn native(env: Enviorment) -> Enviorment {
-    let mut env = env;
-    env.define("clock", Object::Callable(Rc::new(ClockFn {})));
-    env
-}
-
 impl Enviorment {
-    pub fn new(enclosing: Option<Box<Enviorment>>) -> Self {
+    pub fn new(enclosing: Option<Rc<RefCell<Enviorment>>>) -> Rc<RefCell<Self>> {
         let mut env = Enviorment {
             enclosing,
             values: HashMap::new(),
         };
-        env = native(env);
-        env
-    }
-
-    pub fn take_enclosing(&mut self) -> Option<Box<Enviorment>> {
-        self.enclosing.take()
+        if env.enclosing.is_none() {
+            env.define("clock", Object::Callable(Rc::new(ClockFn {})));
+        }
+        Rc::new(RefCell::new(env))
     }
 
     pub fn define(&mut self, name: &str, value: impl Into<Object>) {
         self.values.insert(Box::from(name), value.into());
     }
 
-    pub fn get(&mut self, name: &str) -> Result<&Object, String> {
-        if !self.values.contains_key(name) {
-            if let Some(enclosing) = &mut self.enclosing {
-                return enclosing.get(name);
-            }
-            return Err(format!("Undefined variable '{}'.", name));
+    pub fn get(&self, name: &str) -> Result<Object, String> {
+        if let Some(value) = self.values.get(name) {
+            return Ok(value.clone());
         }
-        Ok(self.values.get(name).unwrap())
+        if let Some(enclosing) = &self.enclosing {
+            return enclosing.borrow().get(name);
+        }
+        Err(format!("Undefined variable '{}'.", name))
     }
 
     pub fn assign(&mut self, name: &str, value: impl Into<Object>) -> Result<(), String> {
-        if !self.values.contains_key(name) {
-            if let Some(enclosing) = &mut self.enclosing {
-                return enclosing.assign(name, value);
-            }
-            return Err(format!("Undefined variable '{}'.", name));
+        if let Some(slot) = self.values.get_mut(name) {
+            *slot = value.into();
+            return Ok(());
         }
-        self.values.insert(Box::from(name), value.into());
-        Ok(())
-    }
-}
-
-impl Default for Enviorment {
-    fn default() -> Self {
-        Enviorment::new(None)
+        if let Some(enclosing) = &self.enclosing {
+            return enclosing.borrow_mut().assign(name, value);
+        }
+        Err(format!("Undefined variable '{}'.", name))
     }
 }
